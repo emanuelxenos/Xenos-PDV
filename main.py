@@ -42,6 +42,9 @@ class App(ctk.CTk):
         self.geometry("1280x760")
         self.minsize(980, 620)
 
+        # Configurar Ícone do Sistema
+        self._configurar_icone()
+
         self.usuario = None
         self._tela_atual_key = None
         self._telas_cache = {}
