@@ -1,8 +1,9 @@
 """
-Sistema Xenos PDV — Ponto de Entrada Principal com Proteção de Licença e Mensalidade.
+Sistema Xenos PDV — Ponto de Entrada Principal com Alteração de Senha e WhatsApp de Suporte.
 """
 import sys
 import os
+import webbrowser
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import customtkinter as ctk
@@ -18,14 +19,16 @@ from telas.caixa import TelaCaixa
 from telas.relatorios import TelaRelatorios
 from telas.contas_receber import TelaContasReceber
 from telas.ativacao import ModalAtivacao
+from telas.alterar_senha import ModalAlterarSenha
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
 
-COR_MENU  = "#1e2a3a"
-COR_HOVER = "#2d3f56"
-COR_ATIVO = "#1a73e8"
-COR_BG    = "#f0f4f8"
+COR_MENU     = "#1e2a3a"
+COR_HOVER    = "#2d3f56"
+COR_ATIVO    = "#1a73e8"
+COR_BG       = "#f0f4f8"
+WHATSAPP_NUM = "5587999308939"
 
 
 class App(ctk.CTk):
@@ -40,13 +43,11 @@ class App(ctk.CTk):
         self._telas_cache = {}
         self._botoes_menu = {}
 
-        # 1. Verifica licença antes de liberar login
         self._checar_licenca_inicial()
 
     def _checar_licenca_inicial(self):
         st, dias, msg, data_val = verificar_licenca()
         if st in ["EXPIRADO", "SEM_LICENCA", "RELOGIO_ADULTERADO"]:
-            # Bloqueio total — exige inserção de chave válida
             ModalAtivacao(self, motivo=msg, on_ativado=self._exibir_login, bloqueio_total=True)
         else:
             self._exibir_login()
@@ -72,13 +73,21 @@ class App(ctk.CTk):
         self.sidebar = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color=COR_MENU)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         self.sidebar.grid_propagate(False)
-        self.sidebar.grid_rowconfigure(20, weight=1)
+        self.sidebar.grid_rowconfigure(25, weight=1)
 
         ctk.CTkLabel(self.sidebar, text="⚡ Xenos PDV", font=("Segoe UI", 16, "bold"), text_color="white").grid(
-            row=0, column=0, padx=16, pady=(18, 2), sticky="w")
+            row=0, column=0, padx=16, pady=(16, 2), sticky="w")
+
+        # Usuário logado + Botão para trocar senha
+        u_box = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        u_box.grid(row=1, column=0, padx=14, pady=(0, 8), sticky="ew")
         u_nome = self.usuario.nome if self.usuario else "Admin"
-        ctk.CTkLabel(self.sidebar, text=f"👤 {u_nome}", font=("Segoe UI", 10), text_color="#8da0b8").grid(
-            row=1, column=0, padx=16, pady=(0, 10), sticky="w")
+        ctk.CTkLabel(u_box, text=f"👤 {u_nome}", font=("Segoe UI", 10), text_color="#8da0b8").pack(side="left")
+
+        btn_senha = ctk.CTkButton(u_box, text="[Mudar Senha]", width=75, height=20, font=("Segoe UI", 8),
+                                  fg_color="transparent", text_color="#90caf9", hover_color="#2d3f56",
+                                  command=self._abrir_alterar_senha)
+        btn_senha.pack(side="right")
 
         ctk.CTkFrame(self.sidebar, height=1, fg_color="#2d3f56").grid(
             row=2, column=0, sticky="ew", padx=12, pady=4)
@@ -97,7 +106,7 @@ class App(ctk.CTk):
         for i, (icon, label, key) in enumerate(menus, start=3):
             btn = ctk.CTkButton(
                 self.sidebar, text=f"  {icon}  {label}",
-                anchor="w", width=200, height=36,
+                anchor="w", width=200, height=35,
                 corner_radius=6, font=("Segoe UI", 11),
                 fg_color="transparent", text_color="#c8d8ea",
                 hover_color=COR_HOVER,
@@ -106,19 +115,27 @@ class App(ctk.CTk):
             btn.grid(row=i, column=0, padx=10, pady=2, sticky="ew")
             self._botoes_menu[key] = btn
 
-        # Botão para gerenciar/renovar licença na barra lateral
+        # Rodapé Lateral: Suporte WhatsApp + Licença
         st, dias, msg, data_val = verificar_licenca()
         texto_lic = f"Validade: {data_val}" if data_val else "Ativar Licença"
+
+        btn_whats = ctk.CTkButton(
+            self.sidebar, text="💬 WhatsApp Suporte", height=28, width=190,
+            font=("Segoe UI", 9, "bold"), fg_color="#25D366", hover_color="#128C7E",
+            command=self._abrir_whatsapp_suporte
+        )
+        btn_whats.grid(row=22, column=0, padx=14, pady=(6, 3), sticky="s")
+
         btn_lic = ctk.CTkButton(
             self.sidebar, text=f"🔑 {texto_lic}", height=28, width=190,
             font=("Segoe UI", 9, "bold"), fg_color="#263238", hover_color="#37474f",
             command=self._abrir_modal_renovacao
         )
-        btn_lic.grid(row=20, column=0, padx=14, pady=(10, 4), sticky="s")
+        btn_lic.grid(row=23, column=0, padx=14, pady=(0, 4), sticky="s")
 
         ctk.CTkLabel(self.sidebar, text="v2.2 • Xenos PDV",
                      font=("Segoe UI", 9), text_color="#4a6080").grid(
-            row=21, column=0, padx=16, pady=(2, 10), sticky="s")
+            row=24, column=0, padx=16, pady=(2, 8), sticky="s")
 
         # ── Área Central de Conteúdo ──
         self.frame_conteudo = ctk.CTkFrame(self, corner_radius=0, fg_color=COR_BG)
@@ -130,10 +147,20 @@ class App(ctk.CTk):
         if st == "EXPIRANDO":
             banner = ctk.CTkFrame(self.frame_conteudo, fg_color="#fff3e0", corner_radius=0, height=36)
             banner.grid(row=0, column=0, sticky="ew")
-            ctk.CTkLabel(banner, text=f"⚠️ {msg} — Clique aqui para renovar",
+            ctk.CTkLabel(banner, text=f"⚠️ {msg}",
                          font=("Segoe UI", 11, "bold"), text_color="#e65100").pack(side="left", padx=16, pady=6)
+            ctk.CTkButton(banner, text="💬 Falar no WhatsApp", height=26, width=140, fg_color="#25D366",
+                          command=self._abrir_whatsapp_suporte).pack(side="right", padx=12, pady=5)
             ctk.CTkButton(banner, text="Renovar Agora", height=26, width=110, fg_color="#e65100",
-                          command=self._abrir_modal_renovacao).pack(side="right", padx=12, pady=5)
+                          command=self._abrir_modal_renovacao).pack(side="right", padx=4, pady=5)
+
+    def _abrir_alterar_senha(self):
+        ModalAlterarSenha(self, usuario=self.usuario)
+
+    def _abrir_whatsapp_suporte(self):
+        msg = f"Ola Emanuel! Preciso de suporte/renovacao para o meu Xenos PDV."
+        link = f"https://wa.me/{WHATSAPP_NUM}?text={msg.replace(' ', '%20')}"
+        webbrowser.open(link)
 
     def _abrir_modal_renovacao(self):
         st, dias, msg, data_val = verificar_licenca()
@@ -205,7 +232,7 @@ class App(ctk.CTk):
 
         info = ctk.CTkFrame(frame, corner_radius=8, fg_color="white")
         info.grid(row=2, column=0, columnspan=4, pady=20, padx=24, sticky="ew")
-        ctk.CTkLabel(info, text="💡 Dica: O sistema opera com verificação de licença local. Para renovar o período mensal ou anual, clique em 'Ativar Licença' no rodapé.",
+        ctk.CTkLabel(info, text="💡 Dica: Para suporte técnico ou dúvidas, clique no botão 'WhatsApp Suporte' na barra lateral.",
                      font=("Segoe UI", 12)).pack(padx=20, pady=16)
 
         self._atualizar_dashboard_dados()
