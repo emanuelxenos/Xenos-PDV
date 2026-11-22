@@ -1,18 +1,20 @@
 """
-Sistema Xenos PDV — Ponto de Entrada Principal com Cache de Telas (Zero lag ao alternar menus).
+Sistema Xenos PDV — Ponto de Entrada Principal com Telas de Caixa e Relatórios integradas.
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import customtkinter as ctk
-from core.database import criar_tabelas, get_session, Cliente, Fornecedor, Produto, Venda
+from core.database import criar_tabelas, db_session, Cliente, Fornecedor, Produto, Venda
 from core.auth import criar_admin_padrao
 from telas.login import TelaLogin
 from telas.clientes import TelaClientes
 from telas.fornecedores import TelaFornecedores
 from telas.produtos import TelaProdutos
 from telas.pdv import TelaPDV
+from telas.caixa import TelaCaixa
+from telas.relatorios import TelaRelatorios
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -35,7 +37,6 @@ class App(ctk.CTk):
         self._telas_cache = {}
         self._botoes_menu = {}
 
-        # Inicia direto na tela de login integrada
         self._exibir_login()
 
     def _exibir_login(self):
@@ -61,7 +62,6 @@ class App(ctk.CTk):
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_rowconfigure(20, weight=1)
 
-        # Cabeçalho Menu
         ctk.CTkLabel(self.sidebar, text="⚡ Xenos PDV", font=("Segoe UI", 16, "bold"), text_color="white").grid(
             row=0, column=0, padx=16, pady=(20, 2), sticky="w")
         u_nome = self.usuario.nome if self.usuario else "Admin"
@@ -71,10 +71,12 @@ class App(ctk.CTk):
         ctk.CTkFrame(self.sidebar, height=1, fg_color="#2d3f56").grid(
             row=2, column=0, sticky="ew", padx=12, pady=4)
 
-        # Itens de menu
+        # Menus completos
         menus = [
             ("🏠", "Dashboard",       "dashboard"),
             ("🛒", "Frente de Caixa", "pdv"),
+            ("💵", "Fluxo de Caixa",  "caixa"),
+            ("📊", "Relatórios Vendas","relatorios"),
             ("📦", "Produtos",        "produtos"),
             ("👤", "Clientes",        "clientes"),
             ("🏭", "Fornecedores",    "fornecedores"),
@@ -82,16 +84,15 @@ class App(ctk.CTk):
         for i, (icon, label, key) in enumerate(menus, start=3):
             btn = ctk.CTkButton(
                 self.sidebar, text=f"  {icon}  {label}",
-                anchor="w", width=200, height=42,
+                anchor="w", width=200, height=40,
                 corner_radius=6, font=("Segoe UI", 12),
                 fg_color="transparent", text_color="#c8d8ea",
                 hover_color=COR_HOVER,
                 command=lambda k=key: self._abrir(k)
             )
-            btn.grid(row=i, column=0, padx=10, pady=3, sticky="ew")
+            btn.grid(row=i, column=0, padx=10, pady=2, sticky="ew")
             self._botoes_menu[key] = btn
 
-        # Rodapé
         ctk.CTkLabel(self.sidebar, text="v2.0 • Python & SQLite",
                      font=("Segoe UI", 9), text_color="#4a6080").grid(
             row=21, column=0, padx=16, pady=12, sticky="sw")
@@ -103,25 +104,25 @@ class App(ctk.CTk):
         self.frame_conteudo.grid_rowconfigure(0, weight=1)
 
     def _abrir(self, key: str):
-        # Evita recarregar se o usuário clicar no mesmo botão que já está aberto
         if self._tela_atual_key == key:
             return
 
-        # Atualiza o visual dos botões
         for k, btn in self._botoes_menu.items():
             btn.configure(fg_color=COR_ATIVO if k == key else "transparent",
                           text_color="white" if k == key else "#c8d8ea")
 
-        # Oculta a tela atualmente visível (sem destruição de widgets pesados)
         if self._tela_atual_key and self._tela_atual_key in self._telas_cache:
             self._telas_cache[self._tela_atual_key].grid_forget()
 
-        # Cria ou reusa a tela do cache instantaneamente
         if key not in self._telas_cache:
             if key == "dashboard":
                 tela = self._criar_tela_dashboard()
             elif key == "pdv":
                 tela = TelaPDV(self.frame_conteudo, usuario=self.usuario)
+            elif key == "caixa":
+                tela = TelaCaixa(self.frame_conteudo, usuario=self.usuario)
+            elif key == "relatorios":
+                tela = TelaRelatorios(self.frame_conteudo, usuario=self.usuario)
             elif key == "produtos":
                 tela = TelaProdutos(self.frame_conteudo)
             elif key == "clientes":
@@ -131,12 +132,12 @@ class App(ctk.CTk):
             self._telas_cache[key] = tela
         else:
             tela = self._telas_cache[key]
-            # Se for dashboard, atualiza os números em tempo real
-            if key == "dashboard" and hasattr(self, "_atualizar_dashboard_dados"):
+            if key == "dashboard":
                 self._atualizar_dashboard_dados()
-            # Atualiza lista dos outros se tiver método de load
             elif hasattr(tela, "_load"):
                 tela._load()
+            elif hasattr(tela, "_filtrar"):
+                tela._filtrar("HOJE")
 
         tela.grid(row=0, column=0, sticky="nsew")
         self._tela_atual_key = key
@@ -166,7 +167,7 @@ class App(ctk.CTk):
 
         info = ctk.CTkFrame(frame, corner_radius=8, fg_color="white")
         info.grid(row=2, column=0, columnspan=4, pady=24, padx=24, sticky="ew")
-        ctk.CTkLabel(info, text="💡 Dica: Acesse 'Frente de Caixa' para registrar vendas rápidas ou 'Produtos' para atualizar o estoque.",
+        ctk.CTkLabel(info, text="💡 Dica: Acesse 'Fluxo de Caixa' para controlar sangrias e entradas, ou 'Relatórios Vendas' para consultar faturamento.",
                      font=("Segoe UI", 12)).pack(padx=20, pady=16)
 
         self._atualizar_dashboard_dados()
@@ -175,13 +176,11 @@ class App(ctk.CTk):
     def _atualizar_dashboard_dados(self):
         if not hasattr(self, "_dash_cards_lbls"):
             return
-        sess = get_session()
-        tot_cli  = sess.query(Cliente).filter_by(ativo=True).count()
-        tot_prod = sess.query(Produto).filter_by(ativo=True).count()
-        tot_forn = sess.query(Fornecedor).filter_by(ativo=True).count()
-        vendas = sess.query(Venda).filter_by(status="CONCLUIDA").all()
+        tot_cli  = db_session.query(Cliente).filter_by(ativo=True).count()
+        tot_prod = db_session.query(Produto).filter_by(ativo=True).count()
+        tot_forn = db_session.query(Fornecedor).filter_by(ativo=True).count()
+        vendas = db_session.query(Venda).filter_by(status="CONCLUIDA").all()
         tot_vendas_valor = sum(v.total for v in vendas)
-        sess.close()
 
         self._dash_cards_lbls["vendas"].configure(
             text=f"R$ {tot_vendas_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))

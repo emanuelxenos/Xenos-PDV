@@ -1,6 +1,6 @@
 """
 Modelos do banco de dados — SQLite via SQLAlchemy.
-Chaves primárias automáticas via autoincrement (id).
+Inclui modelo de Movimentação de Caixa (Abertura, Sangria, Suprimento e Fechamento).
 """
 from sqlalchemy import (create_engine, Column, Integer, String, Float,
                         DateTime, Boolean, Text, ForeignKey)
@@ -37,6 +37,17 @@ class Usuario(Base):
     perfil     = Column(String(20), default="operador")
     ativo      = Column(Boolean, default=True)
     criado_em  = Column(DateTime, default=datetime.now)
+
+
+class MovimentoCaixa(Base):
+    __tablename__ = "movimentos_caixa"
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    data_hora  = Column(DateTime, default=datetime.now)
+    tipo       = Column(String(20), nullable=False)  # SUPRIMENTO | SANGRIA | ABERTURA | FECHAMENTO
+    valor      = Column(Float, default=0.0)
+    descricao  = Column(String(150))
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    usuario    = relationship("Usuario")
 
 
 class Cliente(Base):
