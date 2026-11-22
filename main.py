@@ -1,5 +1,5 @@
 """
-Sistema Xenos PDV — Ponto de Entrada Principal com Central Única de Backup no Menu Lateral.
+Sistema Xenos PDV — Ponto de Entrada Principal com Emissão de Etiquetas Integrada.
 """
 import sys
 import os
@@ -20,6 +20,7 @@ from telas.caixa import TelaCaixa
 from telas.relatorios import TelaRelatorios
 from telas.contas_receber import TelaContasReceber
 from telas.estoque_alerta import TelaEstoqueAlerta
+from telas.etiquetas import TelaEtiquetas
 from telas.backup import TelaBackup
 from telas.ativacao import ModalAtivacao
 from telas.alterar_senha import ModalAlterarSenha
@@ -95,10 +96,10 @@ class App(ctk.CTk):
         ctk.CTkFrame(self.sidebar, height=1, fg_color="#2d3f56").grid(
             row=2, column=0, sticky="ew", padx=12, pady=4)
 
-        # Menus integrados — Central de Backup agora é um menu próprio de tela cheia
         menus = [
             ("🏠", "Dashboard",        "dashboard"),
             ("🛒", "Frente de Caixa",  "pdv"),
+            ("🏷️", "Imprimir Etiquetas","etiquetas"),
             ("⚠️", "Alerta de Estoque","alerta_estoque"),
             ("📖", "Contas a Receber", "contas"),
             ("💵", "Fluxo de Caixa",   "caixa"),
@@ -111,7 +112,7 @@ class App(ctk.CTk):
         for i, (icon, label, key) in enumerate(menus, start=3):
             btn = ctk.CTkButton(
                 self.sidebar, text=f"  {icon}  {label}",
-                anchor="w", width=200, height=33,
+                anchor="w", width=200, height=31,
                 corner_radius=6, font=("Segoe UI", 11),
                 fg_color="transparent", text_color="#c8d8ea",
                 hover_color=COR_HOVER,
@@ -138,7 +139,7 @@ class App(ctk.CTk):
         )
         btn_lic.grid(row=23, column=0, padx=14, pady=(2, 2), sticky="s")
 
-        ctk.CTkLabel(self.sidebar, text="v2.5 • Xenos PDV",
+        ctk.CTkLabel(self.sidebar, text="v2.6 • Xenos PDV",
                      font=("Segoe UI", 9), text_color="#4a6080").grid(
             row=24, column=0, padx=16, pady=(2, 6), sticky="s")
 
@@ -186,6 +187,8 @@ class App(ctk.CTk):
                 tela = self._criar_tela_dashboard()
             elif key == "pdv":
                 tela = TelaPDV(self.frame_conteudo, usuario=self.usuario)
+            elif key == "etiquetas":
+                tela = TelaEtiquetas(self.frame_conteudo)
             elif key == "alerta_estoque":
                 tela = TelaEstoqueAlerta(self.frame_conteudo)
             elif key == "contas":
@@ -209,6 +212,8 @@ class App(ctk.CTk):
                 self._atualizar_dashboard_dados()
             elif hasattr(tela, "_load"):
                 tela._load()
+            elif hasattr(tela, "_load_produtos"):
+                tela._load_produtos()
             elif hasattr(tela, "_listar_backups_disco"):
                 tela._listar_backups_disco()
             elif hasattr(tela, "_filtrar"):
@@ -242,7 +247,7 @@ class App(ctk.CTk):
 
         info = ctk.CTkFrame(frame, corner_radius=8, fg_color="white")
         info.grid(row=2, column=0, columnspan=4, pady=20, padx=24, sticky="ew")
-        ctk.CTkLabel(info, text="🛡️ Central de Backup Integrada: Acesse 'Central de Backup' no menu lateral para visualizar arquivos salvos, restaurar dados ou mudar a frequência automática.",
+        ctk.CTkLabel(info, text="🏷️ Impressão de Etiquetas: Acesse 'Imprimir Etiquetas' para montar filas de impressão de peças de roupa ou pacotes de ração com código de barras.",
                      font=("Segoe UI", 11)).pack(padx=20, pady=16)
 
         self._atualizar_dashboard_dados()
