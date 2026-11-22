@@ -91,8 +91,20 @@ class App(ctk.CTk):
         self.sidebar.grid_propagate(False)
         self.sidebar.grid_rowconfigure(25, weight=1)
 
-        ctk.CTkLabel(self.sidebar, text="⚡ Xenos PDV", font=("Segoe UI", 16, "bold"), text_color="white").grid(
-            row=0, column=0, padx=16, pady=(16, 2), sticky="w")
+        top_brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        top_brand.grid(row=0, column=0, padx=14, pady=(14, 2), sticky="w")
+
+        caminho_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icone.png")
+        if os.path.exists(caminho_logo):
+            try:
+                from PIL import Image
+                img_pil = Image.open(caminho_logo)
+                self._img_logo_sidebar = ctk.CTkImage(light_image=img_pil, dark_image=img_pil, size=(28, 28))
+                ctk.CTkLabel(top_brand, image=self._img_logo_sidebar, text="").pack(side="left", padx=(0, 8))
+            except Exception:
+                pass
+
+        ctk.CTkLabel(top_brand, text="Xenos PDV", font=("Segoe UI", 16, "bold"), text_color="white").pack(side="left")
 
         u_box = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         u_box.grid(row=1, column=0, padx=14, pady=(0, 8), sticky="ew")
