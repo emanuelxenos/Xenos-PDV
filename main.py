@@ -1,5 +1,5 @@
 """
-Sistema Xenos PDV — Ponto de Entrada Principal com Alteração de Senha e WhatsApp de Suporte.
+Sistema Xenos PDV — Ponto de Entrada Principal com Central Única de Backup no Menu Lateral.
 """
 import sys
 import os
@@ -10,6 +10,7 @@ import customtkinter as ctk
 from core.database import criar_tabelas, db_session, Cliente, Fornecedor, Produto, Venda, ContaReceber
 from core.auth import criar_admin_padrao
 from core.licenca import verificar_licenca
+from core.backup import iniciar_servico_backup_automatico
 from telas.login import TelaLogin
 from telas.clientes import TelaClientes
 from telas.fornecedores import TelaFornecedores
@@ -18,6 +19,8 @@ from telas.pdv import TelaPDV
 from telas.caixa import TelaCaixa
 from telas.relatorios import TelaRelatorios
 from telas.contas_receber import TelaContasReceber
+from telas.estoque_alerta import TelaEstoqueAlerta
+from telas.backup import TelaBackup
 from telas.ativacao import ModalAtivacao
 from telas.alterar_senha import ModalAlterarSenha
 
@@ -43,6 +46,7 @@ class App(ctk.CTk):
         self._telas_cache = {}
         self._botoes_menu = {}
 
+        iniciar_servico_backup_automatico()
         self._checar_licenca_inicial()
 
     def _checar_licenca_inicial(self):
@@ -78,7 +82,6 @@ class App(ctk.CTk):
         ctk.CTkLabel(self.sidebar, text="⚡ Xenos PDV", font=("Segoe UI", 16, "bold"), text_color="white").grid(
             row=0, column=0, padx=16, pady=(16, 2), sticky="w")
 
-        # Usuário logado + Botão para trocar senha
         u_box = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         u_box.grid(row=1, column=0, padx=14, pady=(0, 8), sticky="ew")
         u_nome = self.usuario.nome if self.usuario else "Admin"
@@ -92,50 +95,52 @@ class App(ctk.CTk):
         ctk.CTkFrame(self.sidebar, height=1, fg_color="#2d3f56").grid(
             row=2, column=0, sticky="ew", padx=12, pady=4)
 
-        # Menus
+        # Menus integrados — Central de Backup agora é um menu próprio de tela cheia
         menus = [
             ("🏠", "Dashboard",        "dashboard"),
             ("🛒", "Frente de Caixa",  "pdv"),
+            ("⚠️", "Alerta de Estoque","alerta_estoque"),
             ("📖", "Contas a Receber", "contas"),
             ("💵", "Fluxo de Caixa",   "caixa"),
             ("📊", "Relatórios Vendas","relatorios"),
             ("📦", "Produtos",         "produtos"),
             ("👤", "Clientes",         "clientes"),
             ("🏭", "Fornecedores",     "fornecedores"),
+            ("💾", "Central de Backup","backup"),
         ]
         for i, (icon, label, key) in enumerate(menus, start=3):
             btn = ctk.CTkButton(
                 self.sidebar, text=f"  {icon}  {label}",
-                anchor="w", width=200, height=35,
+                anchor="w", width=200, height=33,
                 corner_radius=6, font=("Segoe UI", 11),
                 fg_color="transparent", text_color="#c8d8ea",
                 hover_color=COR_HOVER,
                 command=lambda k=key: self._abrir(k)
             )
-            btn.grid(row=i, column=0, padx=10, pady=2, sticky="ew")
+            btn.grid(row=i, column=0, padx=10, pady=1, sticky="ew")
             self._botoes_menu[key] = btn
 
-        # Rodapé Lateral: Suporte WhatsApp + Licença
+        # Rodapé Lateral
         st, dias, msg, data_val = verificar_licenca()
         texto_lic = f"Validade: {data_val}" if data_val else "Ativar Licença"
 
         btn_whats = ctk.CTkButton(
-            self.sidebar, text="💬 WhatsApp Suporte", height=28, width=190,
+            self.sidebar, text="💬 WhatsApp Suporte", height=26, width=190,
             font=("Segoe UI", 9, "bold"), fg_color="#25D366", hover_color="#128C7E",
             command=self._abrir_whatsapp_suporte
         )
-        btn_whats.grid(row=22, column=0, padx=14, pady=(6, 3), sticky="s")
+        btn_whats.grid(row=22, column=0, padx=14, pady=(6, 2), sticky="s")
 
         btn_lic = ctk.CTkButton(
-            self.sidebar, text=f"🔑 {texto_lic}", height=28, width=190,
+            self.sidebar, text=f"🔑 {texto_lic}", height=26, width=190,
             font=("Segoe UI", 9, "bold"), fg_color="#263238", hover_color="#37474f",
             command=self._abrir_modal_renovacao
         )
-        btn_lic.grid(row=23, column=0, padx=14, pady=(0, 4), sticky="s")
+        btn_lic.grid(row=23, column=0, padx=14, pady=(2, 2), sticky="s")
 
-        ctk.CTkLabel(self.sidebar, text="v2.2 • Xenos PDV",
+        ctk.CTkLabel(self.sidebar, text="v2.5 • Xenos PDV",
                      font=("Segoe UI", 9), text_color="#4a6080").grid(
-            row=24, column=0, padx=16, pady=(2, 8), sticky="s")
+            row=24, column=0, padx=16, pady=(2, 6), sticky="s")
 
         # ── Área Central de Conteúdo ──
         self.frame_conteudo = ctk.CTkFrame(self, corner_radius=0, fg_color=COR_BG)
@@ -143,7 +148,6 @@ class App(ctk.CTk):
         self.frame_conteudo.grid_columnconfigure(0, weight=1)
         self.frame_conteudo.grid_rowconfigure(1, weight=1)
 
-        # Banner de aviso caso esteja expirando em <= 5 dias
         if st == "EXPIRANDO":
             banner = ctk.CTkFrame(self.frame_conteudo, fg_color="#fff3e0", corner_radius=0, height=36)
             banner.grid(row=0, column=0, sticky="ew")
@@ -182,6 +186,8 @@ class App(ctk.CTk):
                 tela = self._criar_tela_dashboard()
             elif key == "pdv":
                 tela = TelaPDV(self.frame_conteudo, usuario=self.usuario)
+            elif key == "alerta_estoque":
+                tela = TelaEstoqueAlerta(self.frame_conteudo)
             elif key == "contas":
                 tela = TelaContasReceber(self.frame_conteudo, usuario=self.usuario)
             elif key == "caixa":
@@ -194,6 +200,8 @@ class App(ctk.CTk):
                 tela = TelaClientes(self.frame_conteudo)
             elif key == "fornecedores":
                 tela = TelaFornecedores(self.frame_conteudo)
+            elif key == "backup":
+                tela = TelaBackup(self.frame_conteudo, on_atualizado=self._montar_layout_principal)
             self._telas_cache[key] = tela
         else:
             tela = self._telas_cache[key]
@@ -201,6 +209,8 @@ class App(ctk.CTk):
                 self._atualizar_dashboard_dados()
             elif hasattr(tela, "_load"):
                 tela._load()
+            elif hasattr(tela, "_listar_backups_disco"):
+                tela._listar_backups_disco()
             elif hasattr(tela, "_filtrar"):
                 tela._filtrar("HOJE")
 
@@ -217,9 +227,9 @@ class App(ctk.CTk):
         self._dash_cards_lbls = {}
         cards = [
             ("💰 Total em Vendas",   "#00897b", "vendas"),
+            ("⚠️ Estoque em Alerta", "#e65100", "alerta"),
             ("📖 A Receber (Fiado)", "#c2185b", "fiado"),
-            ("📦 Produtos Ativos",   "#6a1b9a", "produtos"),
-            ("👤 Clientes",          "#1a73e8", "clientes"),
+            ("📦 Total de Produtos", "#6a1b9a", "produtos"),
         ]
 
         for col, (titulo, cor, k) in enumerate(cards):
@@ -232,8 +242,8 @@ class App(ctk.CTk):
 
         info = ctk.CTkFrame(frame, corner_radius=8, fg_color="white")
         info.grid(row=2, column=0, columnspan=4, pady=20, padx=24, sticky="ew")
-        ctk.CTkLabel(info, text="💡 Dica: Para suporte técnico ou dúvidas, clique no botão 'WhatsApp Suporte' na barra lateral.",
-                     font=("Segoe UI", 12)).pack(padx=20, pady=16)
+        ctk.CTkLabel(info, text="🛡️ Central de Backup Integrada: Acesse 'Central de Backup' no menu lateral para visualizar arquivos salvos, restaurar dados ou mudar a frequência automática.",
+                     font=("Segoe UI", 11)).pack(padx=20, pady=16)
 
         self._atualizar_dashboard_dados()
         return frame
@@ -241,7 +251,6 @@ class App(ctk.CTk):
     def _atualizar_dashboard_dados(self):
         if not hasattr(self, "_dash_cards_lbls"):
             return
-        tot_cli  = db_session.query(Cliente).filter_by(ativo=True).count()
         tot_prod = db_session.query(Produto).filter_by(ativo=True).count()
         vendas = db_session.query(Venda).filter_by(status="CONCLUIDA").all()
         tot_vendas_valor = sum(v.total for v in vendas)
@@ -249,12 +258,17 @@ class App(ctk.CTk):
         contas = db_session.query(ContaReceber).filter(ContaReceber.status.in_(["PENDENTE", "PARCIAL"])).all()
         tot_fiado = sum(c.saldo_devedor for c in contas)
 
+        prods_alerta = db_session.query(Produto).filter(
+            Produto.ativo == True,
+            (Produto.estoque <= Produto.estoque_minimo) | (Produto.estoque <= 0.0)
+        ).count()
+
         self._dash_cards_lbls["vendas"].configure(
             text=f"R$ {tot_vendas_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        self._dash_cards_lbls["alerta"].configure(text=f"{prods_alerta} itens")
         self._dash_cards_lbls["fiado"].configure(
             text=f"R$ {tot_fiado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         self._dash_cards_lbls["produtos"].configure(text=str(tot_prod))
-        self._dash_cards_lbls["clientes"].configure(text=str(tot_cli))
 
 
 if __name__ == "__main__":
