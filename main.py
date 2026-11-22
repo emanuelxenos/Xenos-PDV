@@ -210,6 +210,8 @@ class App(ctk.CTk):
             tela = self._telas_cache[key]
             if key == "dashboard":
                 self._atualizar_dashboard_dados()
+            elif key == "pdv" and hasattr(tela, "focar_pesquisa"):
+                tela.focar_pesquisa()
             elif hasattr(tela, "_load"):
                 tela._load()
             elif hasattr(tela, "_load_produtos"):

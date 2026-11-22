@@ -68,6 +68,11 @@ class TelaPDV(ctk.CTkFrame):
         self.carrinho = []
         self.cliente_selecionado = None
         self._ui()
+        self.focar_pesquisa()
+
+    def focar_pesquisa(self):
+        """Coloca o foco imediatamente no campo de código de barras/pesquisa."""
+        self.after(100, lambda: self.ent_codigo.focus_set())
 
     def _ui(self):
         self.grid_columnconfigure(0, weight=3)
