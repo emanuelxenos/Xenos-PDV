@@ -53,6 +53,14 @@ class App(ctk.CTk):
         iniciar_servico_backup_automatico()
         self._checar_licenca_inicial()
 
+    def _configurar_icone(self):
+        caminho_ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icone.ico")
+        if os.path.exists(caminho_ico):
+            try:
+                self.iconbitmap(caminho_ico)
+            except Exception:
+                pass
+
     def _checar_licenca_inicial(self):
         st, dias, msg, data_val = verificar_licenca()
         if st in ["EXPIRADO", "SEM_LICENCA", "RELOGIO_ADULTERADO"]:
