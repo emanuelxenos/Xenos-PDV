@@ -1,9 +1,9 @@
 """
-Tela de Frente de Caixa / PDV com Emissão Automática de Comprovante Não Fiscal Térmico.
+Tela de Frente de Caixa / PDV com Integração Automática ao Contas a Receber (Venda a Prazo).
 """
 import customtkinter as ctk
 from tkinter import ttk, messagebox
-from core.database import db_session, Produto, Cliente, Venda, ItemVenda
+from core.database import db_session, Produto, Cliente, Venda, ItemVenda, ContaReceber
 from core.impressao import emitir_comprovante
 from datetime import datetime
 
@@ -40,7 +40,6 @@ class ModalComprovante(ctk.CTkToplevel):
         ctk.CTkLabel(h, text=f"🧾 Comprovante Não Fiscal — Venda #{self.venda.numero:06d}",
                      font=("Segoe UI", 13, "bold"), text_color="white").pack(side="left", padx=16, pady=10)
 
-        # Pré-visualização do cupom térmico (fonte monoespaçada Courier)
         from core.impressao import formatar_cupom
         texto_cupom = formatar_cupom(self.venda, self.itens, operador=self.operador)
 
@@ -75,7 +74,6 @@ class TelaPDV(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=2)
         self.grid_rowconfigure(0, weight=1)
 
-        # ─── LADO ESQUERDO: Lançamento de Itens e Lista ───
         col_esq = ctk.CTkFrame(self, corner_radius=8)
         col_esq.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
         col_esq.grid_columnconfigure(0, weight=1)
@@ -112,8 +110,7 @@ class TelaPDV(ctk.CTkFrame):
 
         cols = ("Item", "ID", "Descrição", "Qtd", "R$ Unit.", "R$ Total")
         self.tv = ttk.Treeview(frame_tv, columns=cols, show="headings", selectmode="browse", style="SAC.Treeview")
-        for c in cols:
-            self.tv.heading(c, text=c)
+        for c in cols: self.tv.heading(c, text=c)
         self.tv.column("Item",      width=40,  anchor="center")
         self.tv.column("ID",        width=50,  anchor="center")
         self.tv.column("Descrição", width=230)
@@ -140,7 +137,7 @@ class TelaPDV(ctk.CTkFrame):
 
         cli_box = ctk.CTkFrame(col_dir, fg_color="#f0f4f8", corner_radius=6)
         cli_box.pack(fill="x", padx=14, pady=5)
-        ctk.CTkLabel(cli_box, text="Cliente:", font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10, pady=(6, 2))
+        ctk.CTkLabel(cli_box, text="Cliente (Obrigatório para Venda a Prazo):", font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10, pady=(6, 2))
         self.combo_cli = ctk.CTkComboBox(cli_box, values=self._listar_clientes())
         self.combo_cli.pack(fill="x", padx=10, pady=(0, 8))
 
@@ -155,7 +152,7 @@ class TelaPDV(ctk.CTkFrame):
         pgto_box.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(pgto_box, text="Forma de Pgto:", font=("Segoe UI", 11)).grid(row=0, column=0, sticky="w", pady=4)
-        self.combo_pgto = ctk.CTkComboBox(pgto_box, values=["DINHEIRO", "PIX", "CARTAO DEBITO", "CARTAO CREDITO", "A PRAZO"])
+        self.combo_pgto = ctk.CTkComboBox(pgto_box, values=["DINHEIRO", "PIX", "CARTAO DEBITO", "CARTAO CREDITO", "A PRAZO (FIADO)"])
         self.combo_pgto.set("DINHEIRO")
         self.combo_pgto.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=4)
 
@@ -173,7 +170,6 @@ class TelaPDV(ctk.CTkFrame):
         self.lbl_troco = ctk.CTkLabel(col_dir, text="Troco: R$ 0,00", font=("Segoe UI", 14, "bold"), text_color=COR_PDV)
         self.lbl_troco.pack(pady=10)
 
-        # Checkbox para perguntar se quer emitir cupom
         self.check_imprimir = ctk.CTkCheckBox(col_dir, text="Emitir Comprovante Térmico", font=("Segoe UI", 11))
         self.check_imprimir.select()
         self.check_imprimir.pack(pady=(0, 10))
@@ -189,22 +185,15 @@ class TelaPDV(ctk.CTkFrame):
 
     def _adicionar_item(self):
         termo = self.ent_codigo.get().strip()
-        if not termo:
-            return
+        if not termo: return
 
         try:
             qtd = float(self.ent_qtd.get().replace(",", "."))
-            if qtd <= 0:
-                qtd = 1.0
-        except:
-            qtd = 1.0
+            if qtd <= 0: qtd = 1.0
+        except: qtd = 1.0
 
-        condicoes = [
-            Produto.codigo_barras == termo,
-            Produto.descricao.ilike(f"%{termo}%")
-        ]
-        if termo.isdigit():
-            condicoes.append(Produto.id == int(termo))
+        condicoes = [Produto.codigo_barras == termo, Produto.descricao.ilike(f"%{termo}%")]
+        if termo.isdigit(): condicoes.append(Produto.id == int(termo))
 
         prod = db_session.query(Produto).filter(
             Produto.ativo == True,
@@ -218,12 +207,8 @@ class TelaPDV(ctk.CTkFrame):
         total_item = qtd * prod.preco_venda
         idx = len(self.carrinho) + 1
         item = {
-            "num": idx,
-            "produto_id": prod.id,
-            "descricao": prod.descricao,
-            "qtd": qtd,
-            "preco": prod.preco_venda,
-            "total": total_item
+            "num": idx, "produto_id": prod.id, "descricao": prod.descricao,
+            "qtd": qtd, "preco": prod.preco_venda, "total": total_item
         }
         self.carrinho.append(item)
         self.tv.insert("", "end", iid=str(idx),
@@ -231,21 +216,17 @@ class TelaPDV(ctk.CTkFrame):
                                f"{prod.preco_venda:.2f}", f"{total_item:.2f}"))
 
         self.ent_codigo.delete(0, "end")
-        self.ent_qtd.delete(0, "end")
-        self.ent_qtd.insert(0, "1")
+        self.ent_qtd.delete(0, "end"); self.ent_qtd.insert(0, "1")
         self.ent_codigo.focus()
         self._atualizar_totais()
 
     def _remover_item(self):
         sel = self.tv.selection()
-        if not sel:
-            messagebox.showwarning("Aviso", "Selecione um item da lista para remover.")
-            return
+        if not sel: return
         item_idx = int(sel[0]) - 1
         if 0 <= item_idx < len(self.carrinho):
             self.carrinho.pop(item_idx)
-            for r in self.tv.get_children():
-                self.tv.delete(r)
+            for r in self.tv.get_children(): self.tv.delete(r)
             for i, it in enumerate(self.carrinho, 1):
                 it["num"] = i
                 self.tv.insert("", "end", iid=str(i),
@@ -255,23 +236,17 @@ class TelaPDV(ctk.CTkFrame):
 
     def _atualizar_totais(self):
         subtotal = sum(i["total"] for i in self.carrinho)
-        try:
-            desc = float(self.ent_desc.get().replace(",", "."))
-        except:
-            desc = 0.0
-
+        try: desc = float(self.ent_desc.get().replace(",", "."))
+        except: desc = 0.0
         total = max(0.0, subtotal - desc)
         self.lbl_total.configure(text=f"R$ {total:.2f}")
         self._atualizar_troco()
 
     def _atualizar_troco(self):
         subtotal = sum(i["total"] for i in self.carrinho)
-        try:
-            desc = float(self.ent_desc.get().replace(",", "."))
-        except:
-            desc = 0.0
+        try: desc = float(self.ent_desc.get().replace(",", "."))
+        except: desc = 0.0
         total = max(0.0, subtotal - desc)
-
         try:
             rec = float(self.ent_recebido.get().replace(",", "."))
             troco = max(0.0, rec - total)
@@ -284,20 +259,23 @@ class TelaPDV(ctk.CTkFrame):
             messagebox.showwarning("Venda Vazia", "Adicione ao menos um item para finalizar!")
             return
 
-        subtotal = sum(i["total"] for i in self.carrinho)
-        try:
-            desc = float(self.ent_desc.get().replace(",", "."))
-        except:
-            desc = 0.0
-        total = max(0.0, subtotal - desc)
-
-        try:
-            rec = float(self.ent_recebido.get().replace(",", "."))
-        except:
-            rec = total
-
+        forma = self.combo_pgto.get()
         cli_str = self.combo_cli.get()
         cli_id = self._mapa_cli.get(cli_str, None)
+
+        if "A PRAZO" in forma and not cli_id:
+            messagebox.showerror("Atenção", "Para realizar venda A PRAZO (FIADO), selecione um Cliente cadastrado!", parent=self)
+            return
+
+        subtotal = sum(i["total"] for i in self.carrinho)
+        try: desc = float(self.ent_desc.get().replace(",", "."))
+        except: desc = 0.0
+        total = max(0.0, subtotal - desc)
+
+        try: rec = float(self.ent_recebido.get().replace(",", "."))
+        except: rec = 0.0 if "A PRAZO" in forma else total
+
+        troco = 0.0 if "A PRAZO" in forma else max(0.0, rec - total)
 
         ultima = db_session.query(Venda).order_by(Venda.id.desc()).first()
         proximo_num = (ultima.numero + 1) if ultima and ultima.numero else 1
@@ -311,14 +289,15 @@ class TelaPDV(ctk.CTkFrame):
                 subtotal=subtotal,
                 desconto=desc,
                 total=total,
-                forma_pgto=self.combo_pgto.get(),
+                forma_pgto=forma,
                 valor_pago=rec,
-                troco=max(0.0, rec - total),
+                troco=troco,
                 status="CONCLUIDA"
             )
             db_session.add(nova_venda)
             db_session.flush()
 
+            # Criação dos itens e baixa de estoque
             itens_criados = []
             for item in self.carrinho:
                 item_obj = ItemVenda(
@@ -333,12 +312,26 @@ class TelaPDV(ctk.CTkFrame):
                 itens_criados.append(item_obj)
 
                 p = db_session.query(Produto).get(item["produto_id"])
-                if p:
-                    p.estoque = (p.estoque or 0.0) - item["qtd"]
+                if p: p.estoque = (p.estoque or 0.0) - item["qtd"]
+
+            # SE FOR VENDA A PRAZO: Cria automaticamente a Conta a Receber vinculada ao Cliente
+            if "A PRAZO" in forma:
+                saldo_restante = max(0.0, total - rec)
+                st_conta = "PAGO" if saldo_restante <= 0 else ("PARCIAL" if rec > 0 else "PENDENTE")
+                nova_conta = ContaReceber(
+                    cliente_id=cli_id,
+                    venda_id=nova_venda.id,
+                    data_emissao=datetime.now(),
+                    valor_total=total,
+                    valor_pago=rec,
+                    saldo_devedor=saldo_restante,
+                    status=st_conta,
+                    descricao=f"Venda a Prazo #{nova_venda.numero:06d}"
+                )
+                db_session.add(nova_conta)
 
             db_session.commit()
 
-            # Emitir comprovante térmico se a opção estiver marcada
             if self.check_imprimir.get():
                 op_nome = self.usuario.nome if self.usuario else "Operador"
                 ModalComprovante(self, venda=nova_venda, itens=itens_criados, operador=op_nome)
@@ -353,10 +346,8 @@ class TelaPDV(ctk.CTkFrame):
 
     def _cancelar_venda(self):
         self.carrinho.clear()
-        for r in self.tv.get_children():
-            self.tv.delete(r)
-        self.ent_desc.delete(0, "end")
-        self.ent_desc.insert(0, "0,00")
+        for r in self.tv.get_children(): self.tv.delete(r)
+        self.ent_desc.delete(0, "end"); self.ent_desc.insert(0, "0,00")
         self.ent_recebido.delete(0, "end")
         self.lbl_total.configure(text="R$ 0,00")
         self.lbl_troco.configure(text="Troco: R$ 0,00")

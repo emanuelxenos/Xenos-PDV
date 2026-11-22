@@ -1,6 +1,6 @@
 """
 Modelos do banco de dados — SQLite via SQLAlchemy.
-Inclui modelo de Movimentação de Caixa (Abertura, Sangria, Suprimento e Fechamento).
+Inclui modelo de Contas a Receber (Vendas a Prazo / Fiado e Histórico de Pagamentos).
 """
 from sqlalchemy import (create_engine, Column, Integer, String, Float,
                         DateTime, Boolean, Text, ForeignKey)
@@ -43,7 +43,7 @@ class MovimentoCaixa(Base):
     __tablename__ = "movimentos_caixa"
     id         = Column(Integer, primary_key=True, autoincrement=True)
     data_hora  = Column(DateTime, default=datetime.now)
-    tipo       = Column(String(20), nullable=False)  # SUPRIMENTO | SANGRIA | ABERTURA | FECHAMENTO
+    tipo       = Column(String(20), nullable=False)  # SUPRIMENTO | SANGRIA | ABERTURA | RECEBIMENTO_CONTA
     valor      = Column(Float, default=0.0)
     descricao  = Column(String(150))
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
@@ -69,6 +69,7 @@ class Cliente(Base):
     ativo          = Column(Boolean, default=True)
     criado_em      = Column(DateTime, default=datetime.now)
     vendas         = relationship("Venda", back_populates="cliente")
+    contas         = relationship("ContaReceber", back_populates="cliente")
 
 
 class Fornecedor(Base):
@@ -136,6 +137,7 @@ class Venda(Base):
     cliente    = relationship("Cliente", back_populates="vendas")
     usuario    = relationship("Usuario")
     itens      = relationship("ItemVenda", back_populates="venda", cascade="all, delete-orphan")
+    conta      = relationship("ContaReceber", back_populates="venda", uselist=False)
 
 
 class ItemVenda(Base):
@@ -150,6 +152,22 @@ class ItemVenda(Base):
     total      = Column(Float, default=0.0)
     venda      = relationship("Venda", back_populates="itens")
     produto    = relationship("Produto", back_populates="itens_venda")
+
+
+class ContaReceber(Base):
+    __tablename__ = "contas_receber"
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    cliente_id     = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    venda_id       = Column(Integer, ForeignKey("vendas.id"), nullable=True)
+    data_emissao   = Column(DateTime, default=datetime.now)
+    data_vencimento= Column(DateTime, nullable=True)
+    valor_total    = Column(Float, default=0.0)
+    valor_pago     = Column(Float, default=0.0)
+    saldo_devedor  = Column(Float, default=0.0)
+    status         = Column(String(20), default="PENDENTE")  # PENDENTE | PARCIAL | PAGO
+    descricao      = Column(String(150))
+    cliente        = relationship("Cliente", back_populates="contas")
+    venda          = relationship("Venda", back_populates="conta")
 
 
 def criar_tabelas():

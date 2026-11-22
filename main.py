@@ -1,12 +1,12 @@
 """
-Sistema Xenos PDV — Ponto de Entrada Principal com Telas de Caixa e Relatórios integradas.
+Sistema Xenos PDV — Ponto de Entrada Principal com Contas a Receber integrado.
 """
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import customtkinter as ctk
-from core.database import criar_tabelas, db_session, Cliente, Fornecedor, Produto, Venda
+from core.database import criar_tabelas, db_session, Cliente, Fornecedor, Produto, Venda, ContaReceber
 from core.auth import criar_admin_padrao
 from telas.login import TelaLogin
 from telas.clientes import TelaClientes
@@ -15,6 +15,7 @@ from telas.produtos import TelaProdutos
 from telas.pdv import TelaPDV
 from telas.caixa import TelaCaixa
 from telas.relatorios import TelaRelatorios
+from telas.contas_receber import TelaContasReceber
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -73,19 +74,20 @@ class App(ctk.CTk):
 
         # Menus completos
         menus = [
-            ("🏠", "Dashboard",       "dashboard"),
-            ("🛒", "Frente de Caixa", "pdv"),
-            ("💵", "Fluxo de Caixa",  "caixa"),
+            ("🏠", "Dashboard",        "dashboard"),
+            ("🛒", "Frente de Caixa",  "pdv"),
+            ("📖", "Contas a Receber", "contas"),
+            ("💵", "Fluxo de Caixa",   "caixa"),
             ("📊", "Relatórios Vendas","relatorios"),
-            ("📦", "Produtos",        "produtos"),
-            ("👤", "Clientes",        "clientes"),
-            ("🏭", "Fornecedores",    "fornecedores"),
+            ("📦", "Produtos",         "produtos"),
+            ("👤", "Clientes",         "clientes"),
+            ("🏭", "Fornecedores",     "fornecedores"),
         ]
         for i, (icon, label, key) in enumerate(menus, start=3):
             btn = ctk.CTkButton(
                 self.sidebar, text=f"  {icon}  {label}",
-                anchor="w", width=200, height=40,
-                corner_radius=6, font=("Segoe UI", 12),
+                anchor="w", width=200, height=38,
+                corner_radius=6, font=("Segoe UI", 11),
                 fg_color="transparent", text_color="#c8d8ea",
                 hover_color=COR_HOVER,
                 command=lambda k=key: self._abrir(k)
@@ -93,7 +95,7 @@ class App(ctk.CTk):
             btn.grid(row=i, column=0, padx=10, pady=2, sticky="ew")
             self._botoes_menu[key] = btn
 
-        ctk.CTkLabel(self.sidebar, text="v2.0 • Python & SQLite",
+        ctk.CTkLabel(self.sidebar, text="v2.1 • Python & SQLite",
                      font=("Segoe UI", 9), text_color="#4a6080").grid(
             row=21, column=0, padx=16, pady=12, sticky="sw")
 
@@ -119,6 +121,8 @@ class App(ctk.CTk):
                 tela = self._criar_tela_dashboard()
             elif key == "pdv":
                 tela = TelaPDV(self.frame_conteudo, usuario=self.usuario)
+            elif key == "contas":
+                tela = TelaContasReceber(self.frame_conteudo, usuario=self.usuario)
             elif key == "caixa":
                 tela = TelaCaixa(self.frame_conteudo, usuario=self.usuario)
             elif key == "relatorios":
@@ -151,10 +155,10 @@ class App(ctk.CTk):
 
         self._dash_cards_lbls = {}
         cards = [
-            ("💰 Total em Vendas", "#00897b", "vendas"),
-            ("📦 Produtos Ativos",  "#6a1b9a", "produtos"),
-            ("👤 Clientes",         "#1a73e8", "clientes"),
-            ("🏭 Fornecedores",     "#f57c00", "fornecedores"),
+            ("💰 Total em Vendas",   "#00897b", "vendas"),
+            ("📖 A Receber (Fiado)", "#c2185b", "fiado"),
+            ("📦 Produtos Ativos",   "#6a1b9a", "produtos"),
+            ("👤 Clientes",          "#1a73e8", "clientes"),
         ]
 
         for col, (titulo, cor, k) in enumerate(cards):
@@ -167,7 +171,7 @@ class App(ctk.CTk):
 
         info = ctk.CTkFrame(frame, corner_radius=8, fg_color="white")
         info.grid(row=2, column=0, columnspan=4, pady=24, padx=24, sticky="ew")
-        ctk.CTkLabel(info, text="💡 Dica: Acesse 'Fluxo de Caixa' para controlar sangrias e entradas, ou 'Relatórios Vendas' para consultar faturamento.",
+        ctk.CTkLabel(info, text="💡 Dica: Vendas finalizadas como 'A PRAZO (FIADO)' criam automaticamente títulos no 'Contas a Receber'.",
                      font=("Segoe UI", 12)).pack(padx=20, pady=16)
 
         self._atualizar_dashboard_dados()
@@ -178,15 +182,18 @@ class App(ctk.CTk):
             return
         tot_cli  = db_session.query(Cliente).filter_by(ativo=True).count()
         tot_prod = db_session.query(Produto).filter_by(ativo=True).count()
-        tot_forn = db_session.query(Fornecedor).filter_by(ativo=True).count()
         vendas = db_session.query(Venda).filter_by(status="CONCLUIDA").all()
         tot_vendas_valor = sum(v.total for v in vendas)
 
+        contas = db_session.query(ContaReceber).filter(ContaReceber.status.in_(["PENDENTE", "PARCIAL"])).all()
+        tot_fiado = sum(c.saldo_devedor for c in contas)
+
         self._dash_cards_lbls["vendas"].configure(
             text=f"R$ {tot_vendas_valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        self._dash_cards_lbls["fiado"].configure(
+            text=f"R$ {tot_fiado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         self._dash_cards_lbls["produtos"].configure(text=str(tot_prod))
         self._dash_cards_lbls["clientes"].configure(text=str(tot_cli))
-        self._dash_cards_lbls["fornecedores"].configure(text=str(tot_forn))
 
 
 if __name__ == "__main__":
