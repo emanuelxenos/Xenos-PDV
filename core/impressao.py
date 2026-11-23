@@ -77,5 +77,69 @@ def emitir_comprovante(venda, itens, operador="Operador", abrir_visualizacao=Tru
             os.startfile(caminho_arquivo)
         except Exception:
             pass
+
+
+def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", nome_empresa="XENOS COMERCIO E VAREJO"):
+    """
+    Formata recibo não fiscal para bobina térmica referente ao abatimento/quitação de fiado.
+    """
+    largura = 48
+    sep = "=" * largura
+    sep_fina = "-" * largura
+
+    linhas = []
+    linhas.append(nome_empresa.center(largura))
+    linhas.append("RECIBO DE PAGAMENTO / ABATIMENTO".center(largura))
+    linhas.append(sep)
+    linhas.append(f"Recibo No: #{conta.id:06d}".ljust(24) + f"Data: {datetime.now().strftime('%d/%m/%Y %H:%M')}".rjust(24))
+    linhas.append(f"Operador: {operador}".ljust(largura))
+    cli_nome = conta.cliente.nome if conta.cliente else "Consumidor"
+    linhas.append(f"Cliente : {cli_nome}".ljust(largura))
+    if conta.cliente and conta.cliente.cpf_cnpj:
+        linhas.append(f"CPF/CNPJ: {conta.cliente.cpf_cnpj}".ljust(largura))
+    linhas.append(sep_fina)
+
+    linhas.append(f"Total Original da Divida:".ljust(30) + f"R$ {conta.valor_total:.2f}".rjust(18))
+    linhas.append(f"VALOR PAGO / ABATIDO:".ljust(30) + f"R$ {valor_pago:.2f}".rjust(18))
+    linhas.append(f"Forma de Pagamento: {forma_pgto}".ljust(largura))
+    linhas.append(sep_fina)
+
+    saldo_atual = max(0.0, conta.saldo_devedor)
+    linhas.append(f"SALDO DEVEDOR RESTANTE:".ljust(30) + f"R$ {saldo_atual:.2f}".rjust(18))
+    st = "QUITADO" if saldo_atual <= 0.001 else "PAGAMENTO PARCIAL"
+    linhas.append(f"Situacao: {st}".center(largura))
+    linhas.append(sep)
+    linhas.append("\n\n\n")
+    linhas.append("_____________________________________________".center(largura))
+    linhas.append("Assinatura do Recebedor".center(largura))
+    linhas.append("\n\n")
+    linhas.append("Obrigado pela pontualidade!".center(largura))
+    linhas.append("\n\n\n\n\n")
+
+    return "\n".join(linhas)
+
+
+def emitir_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", abrir_visualizacao=True):
+    """
+    Salva o recibo de pagamento na pasta de cupons e abre para impressão.
+    """
+    recibo_txt = formatar_recibo_pagamento(conta, valor_pago, forma_pgto=forma_pgto, operador=operador)
+    pasta_cupons = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dados", "cupons")
+    os.makedirs(pasta_cupons, exist_ok=True)
+
+    agora_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    caminho_arquivo = os.path.join(pasta_cupons, f"recibo_abate_conta_{conta.id:04d}_{agora_str}.txt")
+
+    with open(caminho_arquivo, "w", encoding="utf-8") as f:
+        f.write(recibo_txt)
+
+    if abrir_visualizacao:
+        try:
+            os.startfile(caminho_arquivo)
+        except Exception:
+            pass
+
+    return caminho_arquivo
+
             
     return caminho_arquivo

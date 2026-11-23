@@ -62,6 +62,11 @@ class ModalBaixaConta(ctk.CTkToplevel):
         self.combo_forma.set("DINHEIRO")
         self.combo_forma.pack(fill="x", pady=(0, 14))
 
+        self.check_comprovante = ctk.CTkCheckBox(f, text="Imprimir Comprovante de Pagamento / Abate",
+                                                 font=("Segoe UI", 11, "bold"), text_color="#ad1457")
+        self.check_comprovante.select()
+        self.check_comprovante.pack(anchor="w", pady=(0, 10))
+
         bot = ctk.CTkFrame(self, fg_color="transparent")
         bot.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 16))
         ctk.CTkButton(bot, text="Confirmar Recebimento", font=("Segoe UI", 12, "bold"), fg_color=VD,
@@ -103,7 +108,14 @@ class ModalBaixaConta(ctk.CTkToplevel):
 
         try:
             db_session.commit()
-            messagebox.showinfo("Sucesso", f"Recebimento de R$ {val:.2f} registrado com sucesso!", parent=self)
+            
+            # Emissão do comprovante térmico se selecionado
+            if self.check_comprovante.get():
+                from core.impressao import emitir_recibo_pagamento
+                op_nome = self.usuario.nome if self.usuario else "Operador"
+                emitir_recibo_pagamento(self.conta, valor_pago=val, forma_pgto=forma, operador=op_nome, abrir_visualizacao=True)
+
+            messagebox.showinfo("Sucesso", f"Recebimento de R$ {val:.2f} registrado com sucesso!\nSaldo devedor restante: R$ {self.conta.saldo_devedor:.2f}", parent=self)
             if self.on_sucesso:
                 self.on_sucesso()
             self.destroy()
