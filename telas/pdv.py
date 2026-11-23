@@ -371,7 +371,7 @@ class ModalComprovante(ctk.CTkToplevel):
                       command=self.destroy).pack(side="right", padx=6)
 
     def _imprimir(self):
-        emitir_comprovante(self.venda, self.itens, operador=self.operador, abrir_visualizacao=True)
+        emitir_comprovante(self.venda, self.itens, operador=self.operador, abrir_visualizacao=False)
         self.destroy()
 
 
