@@ -487,7 +487,8 @@ class TelaPDV(ctk.CTkFrame):
         pgto_box.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(pgto_box, text="Forma de Pgto:", font=("Segoe UI", 11)).grid(row=0, column=0, sticky="w", pady=4)
-        self.combo_pgto = ctk.CTkComboBox(pgto_box, values=["DINHEIRO", "PIX", "CARTAO DEBITO", "CARTAO CREDITO", "A PRAZO (FIADO)"])
+        self.combo_pgto = ctk.CTkComboBox(pgto_box, values=["DINHEIRO", "PIX", "CARTAO DEBITO", "CARTAO CREDITO", "A PRAZO (FIADO)"],
+                                          command=self._on_trocar_forma_pgto)
         self.combo_pgto.set("DINHEIRO")
         self.combo_pgto.grid(row=0, column=1, sticky="ew", padx=(8, 0), pady=4)
 
@@ -512,6 +513,13 @@ class TelaPDV(ctk.CTkFrame):
         btn_finalizar = ctk.CTkButton(col_dir, text="✔  FINALIZAR VENDA", height=48, font=("Segoe UI", 14, "bold"),
                                       fg_color=VERDE, hover_color="#1b5e20", command=self._finalizar_venda)
         btn_finalizar.pack(fill="x", padx=14, pady=(10, 14), side="bottom")
+
+    def _on_trocar_forma_pgto(self, escolha):
+        if "A PRAZO" in escolha:
+            self.ent_recebido.delete(0, "end")
+            self.lbl_troco.configure(text="A Prazo: R$ 0,00 recebido")
+        else:
+            self._atualizar_troco()
 
     def _abrir_busca_cliente(self):
         ModalBuscarCliente(self, on_selecionado=self._definir_cliente)
@@ -684,10 +692,24 @@ class TelaPDV(ctk.CTkFrame):
         desc_reais = self._calcular_desconto_valor(subtotal)
         total = max(0.0, subtotal - desc_reais)
 
-        try: rec = float(self.ent_recebido.get().replace(",", "."))
-        except: rec = 0.0 if "A PRAZO" in forma else total
-
-        troco = 0.0 if "A PRAZO" in forma else max(0.0, rec - total)
+        # Se for VENDA A PRAZO (FIADO), a dívida vai 100% integral como PENDENTE
+        # O valor recebido no ato só é considerado se o operador tiver digitado expressamente uma entrada parcial menor que o total
+        eh_a_prazo = "A PRAZO" in forma
+        if eh_a_prazo:
+            try:
+                rec_val = float(self.ent_recebido.get().strip().replace(",", "."))
+                # Se digitou exatamente o total ou mais, num fiado isso é engano de digitação: entrada deve ser 0
+                if rec_val >= total:
+                    rec = 0.0
+                else:
+                    rec = max(0.0, rec_val)
+            except:
+                rec = 0.0
+            troco = 0.0
+        else:
+            try: rec = float(self.ent_recebido.get().replace(",", "."))
+            except: rec = total
+            troco = max(0.0, rec - total)
 
         ultima = db_session.query(Venda).order_by(Venda.id.desc()).first()
         proximo_num = (ultima.numero + 1) if ultima and ultima.numero else 1
@@ -727,9 +749,9 @@ class TelaPDV(ctk.CTkFrame):
                 if p: p.estoque = (p.estoque or 0.0) - item["qtd"]
 
             # SE FOR VENDA A PRAZO: Cria automaticamente a Conta a Receber vinculada ao Cliente
-            if "A PRAZO" in forma:
+            if eh_a_prazo:
                 saldo_restante = max(0.0, total - rec)
-                st_conta = "PAGO" if saldo_restante <= 0 else ("PARCIAL" if rec > 0 else "PENDENTE")
+                st_conta = "PARCIAL" if (0 < rec < total) else "PENDENTE"
                 nova_conta = ContaReceber(
                     cliente_id=cli_id,
                     venda_id=nova_venda.id,
