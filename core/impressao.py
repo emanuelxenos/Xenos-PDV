@@ -184,12 +184,3 @@ def emitir_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="
             pass
 
     return sucesso_direto
-        try:
-            os.startfile(caminho_arquivo)
-        except Exception:
-            pass
-
-    return caminho_arquivo
-
-            
-    return caminho_arquivo

@@ -17,7 +17,15 @@ hiddenimports = [
     'PIL._tkinter_finder',
     'sqlalchemy.sql.default_comparator',
     'sqlite3',
+    'win32print',
+    'win32ui',
     'core.caminhos',
+    'core.impressao',
+    'core.etiquetas',
+    'core.backup',
+    'core.database',
+    'core.licenca',
+    'core.auth',
 ]
 hiddenimports += collect_submodules('reportlab')
 hiddenimports += collect_submodules('customtkinter')
