@@ -22,6 +22,7 @@ from telas.contas_receber import TelaContasReceber
 from telas.estoque_alerta import TelaEstoqueAlerta
 from telas.etiquetas import TelaEtiquetas
 from telas.backup import TelaBackup
+from telas.usuarios import TelaUsuarios
 from telas.ativacao import ModalAtivacao
 from telas.alterar_senha import ModalAlterarSenha
 
@@ -130,6 +131,7 @@ class App(ctk.CTk):
             ("📦", "Produtos",         "produtos"),
             ("👤", "Clientes",         "clientes"),
             ("🏭", "Fornecedores",     "fornecedores"),
+            ("👥", "Usuários / Acesso","usuarios"),
             ("💾", "Central de Backup","backup"),
         ]
         for i, (icon, label, key) in enumerate(menus, start=3):
@@ -226,6 +228,8 @@ class App(ctk.CTk):
                 tela = TelaClientes(self.frame_conteudo)
             elif key == "fornecedores":
                 tela = TelaFornecedores(self.frame_conteudo)
+            elif key == "usuarios":
+                tela = TelaUsuarios(self.frame_conteudo, usuario_atual=self.usuario)
             elif key == "backup":
                 tela = TelaBackup(self.frame_conteudo, on_atualizado=self._montar_layout_principal)
             self._telas_cache[key] = tela

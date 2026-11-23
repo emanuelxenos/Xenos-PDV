@@ -14,11 +14,16 @@ except Exception:
     TEM_WIN32PRINT = False
 
 
-def formatar_cupom(venda, itens, nome_empresa="XENOS COMERCIO E VAREJO", operador="Operador"):
+from core.licenca import obter_nome_empresa_licenca
+
+
+def formatar_cupom(venda, itens, nome_empresa=None, operador="Operador"):
     """
     Gera o layout formatado compacto para bobina térmica (40/48 colunas).
     Sem desperdício de linhas em branco no final.
     """
+    if not nome_empresa:
+        nome_empresa = obter_nome_empresa_licenca()
     largura = 40
     sep = "=" * largura
     sep_fina = "-" * largura
@@ -122,10 +127,12 @@ def emitir_comprovante(venda, itens, operador="Operador", abrir_visualizacao=Fal
     return sucesso_direto
 
 
-def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", nome_empresa="XENOS COMERCIO E VAREJO"):
+def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", nome_empresa=None):
     """
     Formata recibo não fiscal compacto para bobina térmica.
     """
+    if not nome_empresa:
+        nome_empresa = obter_nome_empresa_licenca()
     largura = 40
     sep = "=" * largura
     sep_fina = "-" * largura

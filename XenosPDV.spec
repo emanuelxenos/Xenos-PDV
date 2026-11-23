@@ -26,6 +26,7 @@ hiddenimports = [
     'core.database',
     'core.licenca',
     'core.auth',
+    'telas.usuarios',
 ]
 hiddenimports += collect_submodules('reportlab')
 hiddenimports += collect_submodules('customtkinter')

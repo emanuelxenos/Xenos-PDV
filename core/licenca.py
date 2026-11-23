@@ -138,3 +138,22 @@ def verificar_licenca():
         return "EXPIRANDO", dias_restantes, f"Atenção: Sua mensalidade vence em {dias_restantes} dia(s) ({data_formatada}).", data_formatada
     else:
         return "VALIDO", dias_restantes, f"Licença ativa até {data_formatada}.", data_formatada
+
+
+def obter_nome_empresa_licenca() -> str:
+    """
+    Retorna o nome do estabelecimento registrado na licença ativa.
+    Se não houver licença ou nome registrado, retorna 'XENOS COMERCIO E VAREJO'.
+    """
+    if not os.path.exists(ARQUIVO_LICENCA):
+        return "XENOS COMERCIO E VAREJO"
+    try:
+        with open(ARQUIVO_LICENCA, "r", encoding="utf-8") as f:
+            conteudo = f.read().strip()
+        dados = decodificar_chave(conteudo)
+        if dados and dados.get("cliente"):
+            return dados["cliente"].strip().upper()
+    except Exception:
+        pass
+    return "XENOS COMERCIO E VAREJO"
+
