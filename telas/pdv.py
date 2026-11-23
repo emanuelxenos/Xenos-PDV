@@ -748,21 +748,44 @@ class TelaPDV(ctk.CTkFrame):
                 p = db_session.query(Produto).get(item["produto_id"])
                 if p: p.estoque = (p.estoque or 0.0) - item["qtd"]
 
-            # SE FOR VENDA A PRAZO: Cria automaticamente a Conta a Receber vinculada ao Cliente
+            # SE FOR VENDA A PRAZO: Soma na conta aberta do cliente (ou cria uma se não houver)
             if eh_a_prazo:
-                saldo_restante = max(0.0, total - rec)
-                st_conta = "PARCIAL" if (0 < rec < total) else "PENDENTE"
-                nova_conta = ContaReceber(
-                    cliente_id=cli_id,
-                    venda_id=nova_venda.id,
-                    data_emissao=datetime.now(),
-                    valor_total=total,
-                    valor_pago=rec,
-                    saldo_devedor=saldo_restante,
-                    status=st_conta,
-                    descricao=f"Venda a Prazo #{nova_venda.numero:06d}"
-                )
-                db_session.add(nova_conta)
+                saldo_adicionar = max(0.0, total - rec)
+
+                # Busca se o cliente já possui conta em aberto (PENDENTE ou PARCIAL)
+                conta_existente = db_session.query(ContaReceber).filter(
+                    ContaReceber.cliente_id == cli_id,
+                    ContaReceber.status.in_(["PENDENTE", "PARCIAL"])
+                ).order_by(ContaReceber.id.desc()).first()
+
+                if conta_existente:
+                    # Acumula na conta existente do cliente
+                    conta_existente.valor_total = (conta_existente.valor_total or 0.0) + total
+                    conta_existente.valor_pago  = (conta_existente.valor_pago or 0.0) + rec
+                    conta_existente.saldo_devedor = (conta_existente.saldo_devedor or 0.0) + saldo_adicionar
+                    conta_existente.status = "PARCIAL" if conta_existente.valor_pago > 0 else "PENDENTE"
+                    conta_existente.venda_id = nova_venda.id
+                    # Anexa o histórico da nova venda na descrição
+                    desc_venda = f"Venda #{nova_venda.numero:06d}"
+                    if conta_existente.descricao:
+                        if desc_venda not in conta_existente.descricao:
+                            conta_existente.descricao = f"{conta_existente.descricao}, {desc_venda}"
+                    else:
+                        conta_existente.descricao = f"Venda a Prazo #{nova_venda.numero:06d}"
+                else:
+                    # Se não tem nenhuma conta aberta, cria a conta corrente do cliente
+                    st_conta = "PARCIAL" if (0 < rec < total) else "PENDENTE"
+                    nova_conta = ContaReceber(
+                        cliente_id=cli_id,
+                        venda_id=nova_venda.id,
+                        data_emissao=datetime.now(),
+                        valor_total=total,
+                        valor_pago=rec,
+                        saldo_devedor=saldo_adicionar,
+                        status=st_conta,
+                        descricao=f"Venda a Prazo #{nova_venda.numero:06d}"
+                    )
+                    db_session.add(nova_conta)
 
             db_session.commit()
 
