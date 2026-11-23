@@ -218,6 +218,115 @@ class ModalPesagemProduto(ctk.CTkToplevel):
         self.destroy()
 
 
+class ModalBuscarCliente(ctk.CTkToplevel):
+    """
+    Modal rápido para busca de cliente por Nome, CPF ou Apelido/Observação.
+    Evita travar o PDV com listas gigantescas de milhares de clientes.
+    """
+    def __init__(self, master, on_selecionado):
+        super().__init__(master)
+        self.on_selecionado = on_selecionado
+
+        self.title("Buscar Cliente")
+        self.geometry("650x420")
+        self.resizable(False, False)
+        self.grab_set()
+
+        self.update_idletasks()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"650x420+{(sw-650)//2}+{(sh-420)//2}")
+
+        self._build()
+
+    def _build(self):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
+        h = ctk.CTkFrame(self, fg_color=COR_PDV, corner_radius=0, height=45)
+        h.grid(row=0, column=0, sticky="ew")
+        ctk.CTkLabel(h, text="👤  BUSCAR CLIENTE (Venda a Prazo / Identificação)",
+                     font=("Segoe UI", 12, "bold"), text_color="white").pack(side="left", padx=16, pady=10)
+
+        f_busca = ctk.CTkFrame(self, fg_color="#f0f4f8", corner_radius=6)
+        f_busca.grid(row=1, column=0, sticky="ew", padx=16, pady=(12, 6))
+        f_busca.grid_columnconfigure(0, weight=1)
+
+        self.ent_busca = ctk.CTkEntry(f_busca, placeholder_text="Digite o nome, CPF ou apelido do cliente...", height=36)
+        self.ent_busca.grid(row=0, column=0, padx=10, pady=8, sticky="ew")
+        self.ent_busca.bind("<KeyRelease>", lambda e: self._filtrar())
+        self.ent_busca.bind("<Return>", lambda e: self._confirmar())
+
+        f_tv = ctk.CTkFrame(self, fg_color="transparent")
+        f_tv.grid(row=2, column=0, sticky="nsew", padx=16, pady=6)
+        f_tv.grid_columnconfigure(0, weight=1)
+        f_tv.grid_rowconfigure(0, weight=1)
+
+        cols = ("ID", "Nome do Cliente", "CPF/CNPJ", "Cidade", "Detalhes")
+        self.tv = ttk.Treeview(f_tv, columns=cols, show="headings", selectmode="browse", style="SAC.Treeview")
+        for c in cols: self.tv.heading(c, text=c)
+
+        self.tv.column("ID",              width=50,  anchor="center")
+        self.tv.column("Nome do Cliente", width=240)
+        self.tv.column("CPF/CNPJ",        width=110, anchor="center")
+        self.tv.column("Cidade",          width=100)
+        self.tv.column("Detalhes",        width=130)
+
+        self.tv.grid(row=0, column=0, sticky="nsew")
+        sb = ttk.Scrollbar(f_tv, orient="vertical", command=self.tv.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self.tv.configure(yscrollcommand=sb.set)
+
+        self.tv.bind("<Double-1>", lambda e: self._confirmar())
+        self.bind("<Escape>", lambda e: self.destroy())
+
+        bot = ctk.CTkFrame(self, fg_color="transparent", height=45)
+        bot.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 12))
+
+        ctk.CTkLabel(bot, text="[Enter] ou Duplo Clique para selecionar | [Esc] Fechar",
+                     font=("Segoe UI", 10), text_color="gray40").pack(side="left")
+
+        ctk.CTkButton(bot, text="✔ Selecionar", font=("Segoe UI", 12, "bold"), fg_color=COR_PDV,
+                      width=120, height=36, command=self._confirmar).pack(side="right", padx=4)
+        ctk.CTkButton(bot, text="Cancelar", fg_color="gray40", width=80, height=36,
+                      command=self.destroy).pack(side="right", padx=4)
+
+        self.after(100, lambda: self.ent_busca.focus())
+        self._filtrar()
+
+    def _filtrar(self):
+        termo = self.ent_busca.get().strip()
+        for r in self.tv.get_children(): self.tv.delete(r)
+
+        q = db_session.query(Cliente).filter(Cliente.ativo == True)
+        if termo:
+            q = q.filter(
+                (Cliente.nome.ilike(f"%{termo}%")) |
+                (Cliente.cpf_cnpj.ilike(f"%{termo}%")) |
+                (Cliente.observacao.ilike(f"%{termo}%"))
+            )
+        clis = q.order_by(Cliente.nome).limit(40).all()
+
+        self._mapa = {}
+        for c in clis:
+            self._mapa[str(c.id)] = c
+            self.tv.insert("", "end", iid=str(c.id), values=(
+                c.id, c.nome, c.cpf_cnpj or "-", c.cidade or "QUIXABA", c.observacao or ""
+            ))
+
+        if clis:
+            primeiro = str(clis[0].id)
+            self.tv.selection_set(primeiro)
+            self.tv.focus(primeiro)
+
+    def _confirmar(self):
+        sel = self.tv.selection()
+        if not sel: return
+        c = self._mapa.get(sel[0])
+        if c and self.on_selecionado:
+            self.on_selecionado(c)
+        self.destroy()
+
+
 class ModalComprovante(ctk.CTkToplevel):
     def __init__(self, master, venda, itens, operador="Operador"):
         super().__init__(master)
@@ -347,9 +456,25 @@ class TelaPDV(ctk.CTkFrame):
 
         cli_box = ctk.CTkFrame(col_dir, fg_color="#f0f4f8", corner_radius=6)
         cli_box.pack(fill="x", padx=14, pady=5)
-        ctk.CTkLabel(cli_box, text="Cliente (Obrigatório para Venda a Prazo):", font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10, pady=(6, 2))
-        self.combo_cli = ctk.CTkComboBox(cli_box, values=self._listar_clientes())
-        self.combo_cli.pack(fill="x", padx=10, pady=(0, 8))
+        ctk.CTkLabel(cli_box, text="Cliente da Venda:", font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=10, pady=(6, 2))
+
+        box_btn_cli = ctk.CTkFrame(cli_box, fg_color="transparent")
+        box_btn_cli.pack(fill="x", padx=10, pady=(0, 8))
+        box_btn_cli.grid_columnconfigure(0, weight=1)
+
+        self.lbl_cliente_nome = ctk.CTkLabel(box_btn_cli, text="Consumidor Final", font=("Segoe UI", 12, "bold"),
+                                             anchor="w", text_color="#1e2a3a")
+        self.lbl_cliente_nome.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+
+        self.btn_buscar_cli = ctk.CTkButton(box_btn_cli, text="🔍 Buscar", width=75, height=30,
+                                            font=("Segoe UI", 11, "bold"), fg_color=COR_PDV,
+                                            command=self._abrir_busca_cliente)
+        self.btn_buscar_cli.grid(row=0, column=1, padx=(0, 4))
+
+        self.btn_remover_cli = ctk.CTkButton(box_btn_cli, text="✕", width=30, height=30,
+                                             font=("Segoe UI", 11, "bold"), fg_color="gray45",
+                                             hover_color="#c62828", command=self._limpar_cliente)
+        self.btn_remover_cli.grid(row=0, column=2)
 
         card_total = ctk.CTkFrame(col_dir, fg_color=COR_DESTAQUE, corner_radius=8)
         card_total.pack(fill="x", padx=14, pady=12)
@@ -388,10 +513,16 @@ class TelaPDV(ctk.CTkFrame):
                                       fg_color=VERDE, hover_color="#1b5e20", command=self._finalizar_venda)
         btn_finalizar.pack(fill="x", padx=14, pady=(10, 14), side="bottom")
 
-    def _listar_clientes(self):
-        clis = db_session.query(Cliente).filter_by(ativo=True).order_by(Cliente.nome).all()
-        self._mapa_cli = {f"{c.id} - {c.nome}": c.id for c in clis}
-        return ["Consumidor Final"] + list(self._mapa_cli.keys())
+    def _abrir_busca_cliente(self):
+        ModalBuscarCliente(self, on_selecionado=self._definir_cliente)
+
+    def _definir_cliente(self, cliente):
+        self.cliente_selecionado = cliente
+        self.lbl_cliente_nome.configure(text=f"{cliente.id} - {cliente.nome}")
+
+    def _limpar_cliente(self):
+        self.cliente_selecionado = None
+        self.lbl_cliente_nome.configure(text="Consumidor Final")
 
     def _adicionar_item(self):
         termo = self.ent_codigo.get().strip()
@@ -543,11 +674,10 @@ class TelaPDV(ctk.CTkFrame):
             return
 
         forma = self.combo_pgto.get()
-        cli_str = self.combo_cli.get()
-        cli_id = self._mapa_cli.get(cli_str, None)
+        cli_id = self.cliente_selecionado.id if self.cliente_selecionado else None
 
         if "A PRAZO" in forma and not cli_id:
-            messagebox.showerror("Atenção", "Para realizar venda A PRAZO (FIADO), selecione um Cliente cadastrado!", parent=self)
+            messagebox.showerror("Atenção", "Para realizar venda A PRAZO (FIADO), clique em 'Buscar' e selecione um Cliente cadastrado!", parent=self)
             return
 
         subtotal = sum(i["total"] for i in self.carrinho)
@@ -633,7 +763,6 @@ class TelaPDV(ctk.CTkFrame):
         self.ent_recebido.delete(0, "end")
         self.lbl_total.configure(text="R$ 0,00")
         self.lbl_troco.configure(text="Troco: R$ 0,00")
-        self.combo_cli.configure(values=self._listar_clientes())
-        self.combo_cli.set("Consumidor Final")
+        self._limpar_cliente()
         self.combo_pgto.set("DINHEIRO")
         self.ent_codigo.focus()
