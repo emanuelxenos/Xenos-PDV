@@ -17,6 +17,7 @@ hiddenimports = [
     'PIL._tkinter_finder',
     'sqlalchemy.sql.default_comparator',
     'sqlite3',
+    'core.caminhos',
 ]
 hiddenimports += collect_submodules('reportlab')
 hiddenimports += collect_submodules('customtkinter')

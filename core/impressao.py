@@ -63,7 +63,8 @@ def emitir_comprovante(venda, itens, operador="Operador", abrir_visualizacao=Tru
     """
     cupom_txt = formatar_cupom(venda, itens, operador=operador)
     
-    pasta_cupons = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dados", "cupons")
+    from core.caminhos import obter_caminho_dados
+    pasta_cupons = obter_caminho_dados("cupons")
     os.makedirs(pasta_cupons, exist_ok=True)
     
     caminho_arquivo = os.path.join(pasta_cupons, f"cupom_venda_{venda.numero:06d}.txt")
@@ -124,7 +125,8 @@ def emitir_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="
     Salva o recibo de pagamento na pasta de cupons e abre para impressão.
     """
     recibo_txt = formatar_recibo_pagamento(conta, valor_pago, forma_pgto=forma_pgto, operador=operador)
-    pasta_cupons = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dados", "cupons")
+    from core.caminhos import obter_caminho_dados
+    pasta_cupons = obter_caminho_dados("cupons")
     os.makedirs(pasta_cupons, exist_ok=True)
 
     agora_str = datetime.now().strftime("%Y%m%d_%H%M%S")

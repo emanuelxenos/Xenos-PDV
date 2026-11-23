@@ -8,12 +8,13 @@ import json
 import base64
 import os
 from datetime import datetime, date
+from core.caminhos import obter_caminho_dados
 
 # Chave secreta de assinatura digital (conhecida apenas pelo Xenos PDV e pelo gerador)
 SECRET_KEY = b"XENOS-PDV-SISTEMA-COMERCIAL-2026-CHAVE-MESTRA-ASSINATURA"
 
-ARQUIVO_LICENCA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dados", "licenca.key")
-ARQUIVO_TRAVA_TEMPO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dados", ".sync_time")
+ARQUIVO_LICENCA = obter_caminho_dados("licenca.key")
+ARQUIVO_TRAVA_TEMPO = obter_caminho_dados(".sync_time")
 
 
 def assinar_dados(payload_bytes: bytes) -> str:
@@ -55,6 +56,12 @@ def salvar_chave_ativacao(chave_str: str) -> bool:
     os.makedirs(os.path.dirname(ARQUIVO_LICENCA), exist_ok=True)
     with open(ARQUIVO_LICENCA, "w", encoding="utf-8") as f:
         f.write(chave_str.strip())
+    # Limpa a trava de tempo ao ativar com sucesso
+    if os.path.exists(ARQUIVO_TRAVA_TEMPO):
+        try:
+            os.remove(ARQUIVO_TRAVA_TEMPO)
+        except Exception:
+            pass
     return True
 
 
@@ -77,12 +84,16 @@ def checar_relogio_adulterado() -> bool:
 
     try:
         with open(ARQUIVO_TRAVA_TEMPO, "r") as f:
-            ultimo_timestamp = float(f.read().strip())
+            conteudo = f.read().strip()
+            if not conteudo:
+                registrar_ultimo_acesso()
+                return False
+            ultimo_timestamp = float(conteudo)
         agora_timestamp = datetime.now().timestamp()
 
-        # Tolerância de 1 hora para fusos/horário de verão
-        if agora_timestamp < (ultimo_timestamp - 3600):
-            return True  # Relógio foi atrasado!
+        # Tolerancia ampla de 24 horas para fuso/mudancas de horario
+        if agora_timestamp < (ultimo_timestamp - 86400):
+            return True
 
         registrar_ultimo_acesso()
         return False

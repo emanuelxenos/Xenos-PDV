@@ -7,9 +7,9 @@ from sqlalchemy import (create_engine, Column, Integer, String, Float,
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, scoped_session
 from datetime import datetime
 import os
+from core.caminhos import obter_caminho_dados
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH  = os.path.join(BASE_DIR, "dados", "xenos.db")
+DB_PATH = obter_caminho_dados("xenos.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 engine = create_engine(

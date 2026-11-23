@@ -141,7 +141,7 @@ class TelaContasReceber(ctk.CTkFrame):
         ctk.CTkLabel(h, text="📖  Contas a Receber (Vendas a Prazo / Fiado)",
                      font=("Segoe UI", 16, "bold"), text_color="white").pack(side="left", padx=16, pady=10)
 
-        ctk.CTkButton(h, text="💰 Baixar / Receber Pagamento", width=210, height=34, font=("Segoe UI", 12, "bold"),
+        ctk.CTkButton(h, text="💰 Baixa / Receber Pagamento", width=210, height=34, font=("Segoe UI", 12, "bold"),
                       fg_color="white", text_color=COR, hover_color="#f8bbd0", command=self._baixar_conta).pack(side="right", padx=14, pady=8)
 
         # Barra de Filtros e Totalizadores

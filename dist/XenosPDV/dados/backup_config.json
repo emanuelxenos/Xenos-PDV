@@ -1,0 +1,7 @@
+{
+    "ativo": true,
+    "intervalo_horas": 2,
+    "pasta_destino": "C:\\Users\\Emanuel\\Desktop\\Xenos_PDV\\dados\\backups",
+    "max_backups_manter": 15,
+    "ultimo_backup": "23/11/2026 12:14:51"
+}

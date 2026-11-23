@@ -11,11 +11,11 @@ import time
 import json
 from datetime import datetime
 from tkinter import filedialog, messagebox
+from core.caminhos import obter_caminho_dados
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH  = os.path.join(BASE_DIR, "dados", "xenos.db")
-PASTA_BACKUPS_PADRAO = os.path.join(BASE_DIR, "dados", "backups")
-ARQUIVO_CFG_BACKUP   = os.path.join(BASE_DIR, "dados", "backup_config.json")
+DB_PATH              = obter_caminho_dados("xenos.db")
+PASTA_BACKUPS_PADRAO = obter_caminho_dados("backups")
+ARQUIVO_CFG_BACKUP   = obter_caminho_dados("backup_config.json")
 
 CFG_PADRAO = {
     "ativo": True,
