@@ -48,6 +48,8 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+icon_path = os.path.abspath(os.path.join(os.path.dirname('__file__'), 'assets', 'icone.ico'))
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -57,13 +59,13 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icone.ico',
+    icon=icon_path,
 )
 
 coll = COLLECT(
