@@ -19,13 +19,13 @@ class ModalBaixaConta(ctk.CTkToplevel):
         self.on_sucesso = on_sucesso
 
         self.title("Receber Pagamento de Conta")
-        self.geometry("450x420")
+        self.geometry("450x460")
         self.resizable(False, False)
         self.grab_set()
 
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.geometry(f"450x420+{(sw-450)//2}+{(sh-420)//2}")
+        self.geometry(f"450x460+{(sw-450)//2}+{(sh-460)//2}")
 
         self._build()
 
@@ -55,6 +55,7 @@ class ModalBaixaConta(ctk.CTkToplevel):
         self.ent_valor = ctk.CTkEntry(f, height=36, font=("Segoe UI", 13, "bold"))
         self.ent_valor.insert(0, f"{self.conta.saldo_devedor:.2f}".replace(".", ","))
         self.ent_valor.pack(fill="x", pady=(0, 10))
+        self.ent_valor.bind("<Return>", lambda e: self._confirmar())
         self.ent_valor.focus()
 
         ctk.CTkLabel(f, text="Forma de Entrada no Caixa:", font=("Segoe UI", 11)).pack(anchor="w", pady=(0, 2))
@@ -74,19 +75,25 @@ class ModalBaixaConta(ctk.CTkToplevel):
         ctk.CTkButton(bot, text="Cancelar", fg_color="gray40", height=40, command=self.destroy).pack(side="right", padx=4)
 
     def _confirmar(self):
+        txt = self.ent_valor.get().strip().replace("R$", "").replace("r$", "").replace(" ", "")
         try:
-            val = float(self.ent_valor.get().replace(",", "."))
+            val = float(txt.replace(",", "."))
             if val <= 0: raise ValueError
         except:
             messagebox.showerror("Aviso", "Informe um valor de pagamento válido!", parent=self)
             return
 
-        if val > self.conta.saldo_devedor:
+        # Tolerância de 1 centavo para arredondamentos de ponto flutuante
+        if val > (self.conta.saldo_devedor + 0.01):
             messagebox.showerror("Aviso", f"O valor informado (R$ {val:.2f}) é maior que a dívida restante (R$ {self.conta.saldo_devedor:.2f})!", parent=self)
             return
 
-        self.conta.valor_pago += val
-        self.conta.saldo_devedor -= val
+        # Se for praticamente igual ao saldo devedor, quita o saldo exato
+        if abs(val - self.conta.saldo_devedor) <= 0.01:
+            val = self.conta.saldo_devedor
+
+        self.conta.valor_pago = (self.conta.valor_pago or 0.0) + val
+        self.conta.saldo_devedor = max(0.0, self.conta.saldo_devedor - val)
 
         if self.conta.saldo_devedor <= 0.001:
             self.conta.saldo_devedor = 0.0
