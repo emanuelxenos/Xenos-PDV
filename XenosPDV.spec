@@ -1,55 +1,29 @@
 # -*- mode: python ; coding: utf-8 -*-
-import os
-import customtkinter
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_all
 
-block_cipher = None
+datas = []
+binaries = []
+hiddenimports = ['reportlab.graphics.barcode.ecc200datamatrix', 'reportlab.graphics.barcode.fourstate', 'reportlab.graphics.barcode.eanbc', 'reportlab.graphics.barcode.qr', 'reportlab.graphics.barcode.usps', 'reportlab.graphics.barcode.code128', 'reportlab.graphics.barcode.code39', 'reportlab.graphics.barcode.code93']
+tmp_ret = collect_all('reportlab')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('customtkinter')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
-ctk_path = os.path.dirname(customtkinter.__file__)
-
-datas = [
-    (ctk_path, 'customtkinter'),
-    ('assets', 'assets'),
-]
-datas += collect_data_files('reportlab')
-
-hiddenimports = [
-    'PIL._tkinter_finder',
-    'sqlalchemy.sql.default_comparator',
-    'sqlite3',
-    'win32print',
-    'win32ui',
-    'core.caminhos',
-    'core.impressao',
-    'core.etiquetas',
-    'core.backup',
-    'core.database',
-    'core.licenca',
-    'core.auth',
-    'telas.usuarios',
-]
-hiddenimports += collect_submodules('reportlab')
-hiddenimports += collect_submodules('customtkinter')
 
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
+    optimize=0,
 )
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
-
-icon_path = os.path.abspath(os.path.join(os.path.dirname('__file__'), 'assets', 'icone.ico'))
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -60,19 +34,17 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,
+    upx=True,
     console=False,
     disable_windowed_traceback=False,
+    argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=icon_path,
 )
-
 coll = COLLECT(
     exe,
     a.binaries,
-    a.zipfiles,
     a.datas,
     strip=False,
     upx=True,
