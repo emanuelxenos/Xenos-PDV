@@ -94,14 +94,17 @@ class ModalFornecedor(ctk.CTkToplevel):
 
         f.observacao = self.obs.get("1.0", "end").strip() or None
 
+        eh_novo = (self.fornecedor is None)
         try:
             db_session.commit()
+            msg = f"Fornecedor '{f.nome}' cadastrado com sucesso!" if eh_novo else f"Fornecedor '{f.nome}' atualizado com sucesso!"
+            messagebox.showinfo("Sucesso", msg, parent=self)
             if self.on_salvar:
                 self.on_salvar()
             self.destroy()
         except Exception as ex:
             db_session.rollback()
-            messagebox.showerror("Erro ao Salvar", str(ex), parent=self)
+            messagebox.showerror("Erro ao Salvar Fornecedor", f"Não foi possível salvar o fornecedor:\n\n{str(ex)}", parent=self)
 
 
 class TelaFornecedores(ctk.CTkFrame):

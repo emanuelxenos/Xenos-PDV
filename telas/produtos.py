@@ -139,14 +139,17 @@ class ModalProduto(ctk.CTkToplevel):
         p.fornecedor_id = self._mapa_forn.get(forn_nome)
         p.observacao = self.obs.get("1.0", "end").strip() or None
 
+        eh_novo = (self.produto is None)
         try:
             db_session.commit()
+            msg = f"Produto '{p.descricao}' cadastrado com sucesso!" if eh_novo else f"Produto '{p.descricao}' atualizado com sucesso!"
+            messagebox.showinfo("Sucesso", msg, parent=self)
             if self.on_salvar:
                 self.on_salvar()
             self.destroy()
         except Exception as ex:
             db_session.rollback()
-            messagebox.showerror("Erro ao Salvar", str(ex), parent=self)
+            messagebox.showerror("Erro ao Salvar Produto", f"Não foi possível salvar o produto:\n\n{str(ex)}", parent=self)
 
 
 class TelaProdutos(ctk.CTkFrame):

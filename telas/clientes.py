@@ -103,14 +103,17 @@ class ModalCliente(ctk.CTkToplevel):
 
         c.observacao = self.obs.get("1.0", "end").strip() or None
 
+        eh_novo = (self.cliente is None)
         try:
             db_session.commit()
+            msg = f"Cliente '{c.nome}' cadastrado com sucesso!" if eh_novo else f"Cliente '{c.nome}' atualizado com sucesso!"
+            messagebox.showinfo("Sucesso", msg, parent=self)
             if self.on_salvar:
                 self.on_salvar()
             self.destroy()
         except Exception as ex:
             db_session.rollback()
-            messagebox.showerror("Erro ao Salvar", str(ex), parent=self)
+            messagebox.showerror("Erro ao Salvar Cliente", f"Não foi possível salvar o cliente:\n\n{str(ex)}", parent=self)
 
 
 class TelaClientes(ctk.CTkFrame):
