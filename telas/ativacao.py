@@ -84,17 +84,23 @@ class ModalAtivacao(ctk.CTkToplevel):
             messagebox.showwarning("Aviso", "Por favor, cole a chave de ativação!", parent=self)
             return
 
+        from core.licenca import decodificar_chave
+        dados = decodificar_chave(chave)
+        if not dados:
+            messagebox.showerror("Chave Inválida", "A chave informada não é válida para o Xenos PDV.\nVerifique se copiou todos os caracteres.", parent=self)
+            return
+
         if salvar_chave_ativacao(chave):
             st, dias, msg, data_fim = verificar_licenca()
             if st in ["VALIDO", "EXPIRANDO"]:
-                messagebox.showinfo("Sucesso", f"Sistema liberado com sucesso até {data_fim}!", parent=self)
+                messagebox.showinfo("Sucesso", f"Sistema liberado com sucesso até {data_fim}!\nEstabelecimento: {dados.get('cliente', '')}", parent=self)
                 if self.on_ativado:
                     self.on_ativado()
                 self.destroy()
             else:
-                messagebox.showerror("Chave Inválida", msg, parent=self)
+                messagebox.showerror("Atenção", f"Chave aceita, porém o sistema não pôde ser liberado:\n{msg}", parent=self)
         else:
-            messagebox.showerror("Erro de Ativação", "Chave de ativação inválida ou incorreta!", parent=self)
+            messagebox.showerror("Erro ao Salvar", "Não foi possível gravar o arquivo de licença no disco.\nVerifique permissões da pasta dados.", parent=self)
 
     def _fechar_bloqueado(self):
         import sys

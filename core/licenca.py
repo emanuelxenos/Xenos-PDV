@@ -28,17 +28,22 @@ def decodificar_chave(chave_str: str):
     Retorna o dict do payload se válido, ou None se inválido/adulterado.
     """
     try:
-        chave_str = chave_str.strip().replace(" ", "").replace("\n", "")
+        chave_str = chave_str.strip().replace(" ", "").replace("\r", "").replace("\n", "")
         partes = chave_str.split(".")
         if len(partes) != 2:
             return None
 
         payload_b64, assinatura_fornecida = partes
+        # Corrige padding se necessário
+        faltam = len(payload_b64) % 4
+        if faltam > 0:
+            payload_b64 += "=" * (4 - faltam)
+
         payload_bytes = base64.b64decode(payload_b64.encode("utf-8"))
 
         # Validação da assinatura digital
         assinatura_esperada = assinar_dados(payload_bytes)
-        if not hmac.compare_digest(assinatura_fornecida, assinatura_esperada):
+        if not hmac.compare_digest(assinatura_fornecida.lower().strip(), assinatura_esperada.lower().strip()):
             return None
 
         dados = json.loads(payload_bytes.decode("utf-8"))
