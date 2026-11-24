@@ -21,6 +21,19 @@ def gerar_pdf_etiquetas(produtos_qtd: list, modelo="A4_3X10", parent_window=None
     modelo: 'A4_3X10' (folha de 30 etiquetas A4 padrão tipo Pimaco)
     """
     os.makedirs(PASTA_ETIQUETAS, exist_ok=True)
+
+    # Limpeza preventiva: remove PDFs de etiquetas gerados anteriormente para não acumular lixo
+    try:
+        for f in os.listdir(PASTA_ETIQUETAS):
+            if f.lower().startswith("etiquetas_") and f.lower().endswith(".pdf"):
+                caminho_antigo = os.path.join(PASTA_ETIQUETAS, f)
+                try:
+                    os.remove(caminho_antigo)
+                except Exception:
+                    pass  # Se estiver aberto em algum visualizador de PDF, ignora
+    except Exception:
+        pass
+
     caminho_pdf = os.path.join(PASTA_ETIQUETAS, f"etiquetas_{os.getpid()}.pdf")
 
     # Margens estreitas para caber na folha A4 (3 colunas x 10 linhas)
