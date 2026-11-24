@@ -61,8 +61,8 @@ def formatar_cupom(venda, itens, nome_empresa=None, operador="Operador"):
         linhas.append("Troco:".ljust(25) + f"R$ {venda.troco:.2f}".rjust(15))
     linhas.append(sep_fina)
     linhas.append("Obrigado pela preferencia!".center(largura))
-    # Espaçamento ideal para a serrilha da impressora térmica (permite rasgar sem cortar o texto)
-    linhas.append("\n\n\n\n\n")
+    # Espaçamento ideal para a serrilha da impressora térmica (permite rasgar com total folga)
+    linhas.append("\n\n\n\n\n\n\n")
 
     return "\n".join(linhas)
 
@@ -164,7 +164,7 @@ def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador
     linhas.append("Assinatura do Recebedor".center(largura))
     linhas.append("Obrigado pela pontualidade!".center(largura))
     # Espaçamento ideal para a serrilha da impressora térmica
-    linhas.append("\n\n\n\n\n")
+    linhas.append("\n\n\n\n\n\n\n")
 
     return "\n".join(linhas)
 
