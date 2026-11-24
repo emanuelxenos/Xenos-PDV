@@ -198,12 +198,7 @@ class TelaClientes(ctk.CTkFrame):
         ModalCliente(self, on_salvar=self._load)
 
     def _extrato(self):
-        sel = self.tv.selection()
-        if not sel:
-            messagebox.showwarning("Aviso", "Selecione um cliente para abrir o extrato financeiro!")
-            return
-        cid = int(self.tv.item(sel[0])["values"][0])
-        cli = db_session.query(Cliente).get(cid)
+        cli = self._sel()
         if not cli:
             return
         from telas.contas_receber import ModalExtratoCliente

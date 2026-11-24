@@ -494,7 +494,12 @@ class TelaContasReceber(ctk.CTkFrame):
         if not sel:
             messagebox.showwarning("Aviso", "Selecione uma conta na lista para visualizar o extrato do cliente!")
             return
-        cid = int(self.tv.item(sel[0])["values"][0])
+        try:
+            cid = int(sel[0])
+        except (ValueError, TypeError):
+            val0 = str(self.tv.item(sel[0])["values"][0]).replace("#", "").strip()
+            cid = int(val0)
+
         conta = db_session.query(ContaReceber).get(cid)
         if not conta or not conta.cliente:
             messagebox.showerror("Erro", "Cliente não encontrado para esta conta!")
