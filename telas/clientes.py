@@ -139,8 +139,9 @@ class TelaClientes(ctk.CTkFrame):
         self.busca.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.busca.bind("<KeyRelease>", lambda e: self._load(self.busca.get()))
 
-        ctk.CTkButton(bar, text="✏️ Editar", width=100, height=32, fg_color=COR, command=self._editar).grid(row=0, column=1, padx=4)
-        ctk.CTkButton(bar, text="🗑️ Excluir", width=100, height=32, fg_color=VM, command=self._excluir).grid(row=0, column=2, padx=4)
+        ctk.CTkButton(bar, text="📜 Extrato Financeiro", width=150, height=32, fg_color="#880e4f", hover_color="#ad1457", command=self._extrato).grid(row=0, column=1, padx=4)
+        ctk.CTkButton(bar, text="✏️ Editar", width=90, height=32, fg_color=COR, command=self._editar).grid(row=0, column=2, padx=4)
+        ctk.CTkButton(bar, text="🗑️ Excluir", width=90, height=32, fg_color=VM, command=self._excluir).grid(row=0, column=3, padx=4)
 
         t_frame = ctk.CTkFrame(self, corner_radius=8)
         t_frame.grid(row=2, column=0, sticky="nsew", padx=16, pady=(4, 16))
@@ -195,6 +196,18 @@ class TelaClientes(ctk.CTkFrame):
 
     def _novo(self):
         ModalCliente(self, on_salvar=self._load)
+
+    def _extrato(self):
+        sel = self.tv.selection()
+        if not sel:
+            messagebox.showwarning("Aviso", "Selecione um cliente para abrir o extrato financeiro!")
+            return
+        cid = int(self.tv.item(sel[0])["values"][0])
+        cli = db_session.query(Cliente).get(cid)
+        if not cli:
+            return
+        from telas.contas_receber import ModalExtratoCliente
+        ModalExtratoCliente(self, cli)
 
     def _editar(self):
         c = self._sel()

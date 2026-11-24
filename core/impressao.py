@@ -192,3 +192,86 @@ def emitir_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="
             pass
 
     return sucesso_direto
+
+
+def formatar_extrato_cliente(cliente, movimentacoes, resumo, nome_empresa=None, operador="Operador"):
+    """
+    Formata o extrato completo de dívidas e abatimentos do cliente para impressora térmica de 40 colunas.
+    movimentacoes: lista de dicts com {'data', 'tipo', 'ref', 'valor', 'saldo_apos'}
+    resumo: {'total_compras', 'total_abates', 'saldo_atual'}
+    """
+    if not nome_empresa:
+        nome_empresa = obter_nome_empresa_licenca()
+    largura = 40
+    sep = "=" * largura
+    sep_fina = "-" * largura
+
+    linhas = []
+    linhas.append(nome_empresa.center(largura))
+    linhas.append("EXTRATO DE CONTA / HISTORICO".center(largura))
+    linhas.append("CONTROLE DE DIVIDAS E ABATIMENTOS".center(largura))
+    linhas.append(sep)
+    linhas.append(f"Emissao : {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    linhas.append(f"Operador: {operador}")
+    linhas.append(f"Cliente : {cliente.nome[:30]}")
+    if cliente.cpf_cnpj:
+        linhas.append(f"CPF/CNPJ: {cliente.cpf_cnpj}")
+    if cliente.telefone or cliente.celular:
+        tel = cliente.celular or cliente.telefone
+        linhas.append(f"Telefone: {tel}")
+    linhas.append(sep)
+    linhas.append("DATA       TIPO         VALOR(R$)  SALDO")
+    linhas.append(sep_fina)
+
+    for m in movimentacoes:
+        dt_str = m['data'].strftime('%d/%m/%y') if hasattr(m['data'], 'strftime') else str(m['data'])[:8]
+        tipo_str = m['tipo'][:11].ljust(11) # ex: COMPRA #123 ou ABATIMENTO
+        val_str = f"{m['valor']:.2f}".rjust(8)
+        saldo_str = f"{m['saldo_apos']:.2f}".rjust(8)
+        # Formato: DD/MM/YY  TIPO-LJUST  VALOR  SALDO
+        # 8 + 1 + 11 + 1 + 8 + 1 + 8 = 38 chars
+        linhas.append(f"{dt_str} {tipo_str} {val_str} {saldo_str}")
+        if m.get('detalhe'):
+            linhas.append(f"  {m['detalhe'][:36]}")
+
+    linhas.append(sep_fina)
+    linhas.append("RESUMO FINANCEIRO:".center(largura))
+    linhas.append("Total Compras a Prazo:".ljust(22) + f"R$ {resumo['total_compras']:.2f}".rjust(18))
+    linhas.append("Total Pago/Abatido   :".ljust(22) + f"R$ {resumo['total_abates']:.2f}".rjust(18))
+    linhas.append(sep)
+    linhas.append("SALDO DEVEDOR ATUAL  :".ljust(22) + f"R$ {resumo['saldo_atual']:.2f}".rjust(18))
+    if resumo['saldo_atual'] <= 0.001:
+        linhas.append(">>> CONTA 100% QUITADA <<<".center(largura))
+    else:
+        linhas.append(">>> CONTA PENDENTE <<<".center(largura))
+    linhas.append(sep)
+    linhas.append("")
+    linhas.append("Assinatura do Cliente:".center(largura))
+    linhas.append("")
+    linhas.append("________________________________________")
+    linhas.append(f"{cliente.nome[:38]}".center(largura))
+    linhas.append("")
+    linhas.append("Controle Interno - Xenos PDV".center(largura))
+    # Espaçamento para guilhotina/rasgo do papel
+    linhas.append("\n" * 8)
+
+    return "\n".join(linhas)
+
+
+def emitir_extrato_cliente(cliente, movimentacoes, resumo, operador="Operador", abrir_visualizacao=False):
+    """
+    Gera e envia para a impressora o extrato do cliente.
+    """
+    texto = formatar_extrato_cliente(cliente, movimentacoes, resumo, operador=operador)
+    imprimir_direto_na_impressora(texto)
+
+    if abrir_visualizacao:
+        try:
+            import tempfile
+            import os
+            tf = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="latin-1", errors="replace")
+            tf.write(texto)
+            tf.close()
+            os.startfile(tf.name)
+        except Exception as e:
+            print("Erro ao abrir visualização do extrato:", e)

@@ -168,6 +168,25 @@ class ContaReceber(Base):
     descricao      = Column(String(150))
     cliente        = relationship("Cliente", back_populates="contas")
     venda          = relationship("Venda", back_populates="conta")
+    historico_pagamentos = relationship("HistoricoPagamentoConta", back_populates="conta", cascade="all, delete-orphan")
+
+
+class HistoricoPagamentoConta(Base):
+    __tablename__ = "historico_pagamentos_conta"
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    conta_id       = Column(Integer, ForeignKey("contas_receber.id"), nullable=False)
+    cliente_id     = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    data_hora      = Column(DateTime, default=datetime.now)
+    valor_pago     = Column(Float, nullable=False)
+    forma_pgto     = Column(String(30), default="DINHEIRO")
+    saldo_anterior = Column(Float, default=0.0)
+    saldo_restante = Column(Float, default=0.0)
+    usuario_id     = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    observacao     = Column(String(150), nullable=True)
+
+    conta          = relationship("ContaReceber", back_populates="historico_pagamentos")
+    cliente        = relationship("Cliente")
+    usuario        = relationship("Usuario")
 
 
 def criar_tabelas():
