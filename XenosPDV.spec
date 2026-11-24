@@ -41,6 +41,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['C:\\Users\\Emanuel\\Desktop\\Xenos_PDV\\assets\\icone.ico'],
 )
 coll = COLLECT(
     exe,
