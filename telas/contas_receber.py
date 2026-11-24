@@ -155,22 +155,29 @@ class ModalExtratoCliente(ctk.CTkToplevel):
         self.usuario = usuario
 
         self.title(f"Extrato / Histórico do Cliente — {self.cliente.nome}")
-        self.geometry("820x620")
-        self.minsize(750, 500)
+        self.geometry("860x660")
+        self.minsize(780, 520)
         self.grab_set()
 
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.geometry(f"820x620+{(sw-820)//2}+{(sh-620)//2}")
+        self.geometry(f"860x660+{(sw-860)//2}+{(sh-660)//2}")
+
+        # Paginação e ordenação
+        self.ordem_decrescente = True  # Padrão: Mais recentes primeiro (Decrescente)
+        self.pagina_atual = 1
+        self.itens_por_pagina = 20
 
         self._carregar_dados()
         self._build()
+        self._atualizar_tabela()
 
     def _carregar_dados(self):
         """
-        Carrega todas as compras a prazo e abatimentos do cliente em ordem cronológica.
+        Carrega todas as compras a prazo e abatimentos do cliente em ordem cronológica para cálculo,
+        guardando o timeline completo.
         """
-        self.timeline = [] # list of dicts: {'data', 'tipo', 'ref', 'valor', 'saldo_apos', 'detalhe'}
+        self.timeline = []  # Todos os registros com saldos progressivos calculados cronologicamente
         
         # 1. Obter todas as vendas a prazo do cliente
         vendas_prazo = db_session.query(Venda).filter(
@@ -178,7 +185,7 @@ class ModalExtratoCliente(ctk.CTkToplevel):
             Venda.forma_pgto.ilike("%A PRAZO%")
         ).order_by(Venda.data.asc()).all()
 
-        # 2. Obter todas as contas a receber do cliente (caso haja avulsas sem venda)
+        # 2. Obter todas as contas a receber do cliente (caso haja avulsas/migradas sem venda)
         contas = db_session.query(ContaReceber).filter(
             ContaReceber.cliente_id == self.cliente.id
         ).order_by(ContaReceber.data_emissao.asc()).all()
@@ -188,10 +195,8 @@ class ModalExtratoCliente(ctk.CTkToplevel):
             HistoricoPagamentoConta.cliente_id == self.cliente.id
         ).order_by(HistoricoPagamentoConta.data_hora.asc()).all()
 
-        # Montar lista bruta de eventos
         eventos = []
         
-        # Se existem vendas a prazo registradas:
         vendas_ids_registradas = set()
         for v in vendas_prazo:
             vendas_ids_registradas.add(v.id)
@@ -205,7 +210,6 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 "detalhe": f"Forma: {v.forma_pgto}"
             })
 
-        # Adicionar contas que eventualmente foram lançadas sem venda associada
         for c in contas:
             if c.venda_id and c.venda_id in vendas_ids_registradas:
                 continue
@@ -220,7 +224,6 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                     "detalhe": c.descricao or "Abertura de conta"
                 })
 
-        # Adicionar os pagamentos do histórico
         total_pago_historico = 0.0
         for p in pagamentos:
             total_pago_historico += p.valor_pago
@@ -234,7 +237,6 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 "detalhe": f"{p.forma_pgto} ({p.observacao or ''})"
             })
 
-        # Caso a conta tenha valor_pago anterior à criação da tabela historico_pagamentos
         total_pago_contas = sum(c.valor_pago or 0.0 for c in contas)
         if total_pago_contas > (total_pago_historico + 0.01):
             diferenca = total_pago_contas - total_pago_historico
@@ -248,10 +250,9 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 "detalhe": "Abatimentos anteriores registrados"
             })
 
-        # Ordenar cronologicamente
+        # Ordenar cronologicamente para calcular o saldo devedor progressivo corretamente
         eventos.sort(key=lambda x: x["data"])
 
-        # Calcular saldos progressivos acumulados
         saldo = 0.0
         self.resumo = {"total_compras": 0.0, "total_abates": 0.0, "saldo_atual": 0.0}
         
@@ -277,7 +278,6 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 "tipo_raw": ev["tipo_raw"]
             })
 
-        # O saldo devedor atual consolidado oficial vem das contas em aberto
         saldo_real_contas = sum(c.saldo_devedor for c in contas if c.status != "PAGO")
         if abs(saldo - saldo_real_contas) > 0.05 and saldo_real_contas > 0:
             self.resumo["saldo_atual"] = saldo_real_contas
@@ -300,7 +300,7 @@ class ModalExtratoCliente(ctk.CTkToplevel):
 
         # Cards de Resumo Financeiro
         cards = ctk.CTkFrame(self, fg_color="transparent")
-        cards.grid(row=1, column=0, sticky="ew", padx=16, pady=10)
+        cards.grid(row=1, column=0, sticky="ew", padx=16, pady=(10, 4))
         cards.grid_columnconfigure((0, 1, 2), weight=1)
 
         # Card 1: Compras a Prazo
@@ -328,34 +328,120 @@ class ModalExtratoCliente(ctk.CTkToplevel):
         ctk.CTkLabel(c3, text=f"R$ {self.resumo['saldo_atual']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
                      font=("Segoe UI", 16, "bold"), text_color=cor_tx).pack(pady=(0, 6))
 
-        # Tabela / Timeline
+        # Barra de controles da lista: Ordenação e Itens por página
+        ctrl_bar = ctk.CTkFrame(self, fg_color="transparent")
+        ctrl_bar.grid(row=2, column=0, sticky="ew", padx=16, pady=(4, 4))
+        ctrl_bar.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(ctrl_bar, text="Ordenar por:", font=("Segoe UI", 11, "bold")).pack(side="left", padx=(4, 6))
+        self.btn_ordem = ctk.CTkSegmentedButton(
+            ctrl_bar,
+            values=["Mais Recentes Primeiro (Decrescente)", "Mais Antigos Primeiro (Crescente)"],
+            command=self._on_mudar_ordem
+        )
+        self.btn_ordem.set("Mais Recentes Primeiro (Decrescente)")
+        self.btn_ordem.pack(side="left", padx=4)
+
+        ctk.CTkLabel(ctrl_bar, text="Itens por página:", font=("Segoe UI", 11)).pack(side="right", padx=(4, 4))
+        self.combo_itens_pag = ctk.CTkComboBox(
+            ctrl_bar,
+            values=["10", "20", "50", "100", "Todos"],
+            width=85,
+            command=self._on_mudar_itens_por_pag
+        )
+        self.combo_itens_pag.set("20")
+        self.combo_itens_pag.pack(side="right", padx=4)
+
+        # Container da Tabela
         t_frame = ctk.CTkFrame(self, corner_radius=8)
-        t_frame.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 10))
+        t_frame.grid(row=3, column=0, sticky="nsew", padx=16, pady=(0, 4))
+        self.grid_rowconfigure(3, weight=1)
         t_frame.grid_columnconfigure(0, weight=1)
         t_frame.grid_rowconfigure(0, weight=1)
 
-        cols = ("Data/Hora", "Tipo de Movimentação", "Referência", "Valor (R$)", "Saldo Após (R$)", "Detalhes")
+        cols = ("Data/Hora", "Tipo de Movimentação", "Referência", "Valor (R$)", "Saldo Restante Após (R$)", "Detalhes")
         self.tv = ttk.Treeview(t_frame, columns=cols, show="headings", selectmode="browse", style="SAC.Treeview")
         for c in cols:
             self.tv.heading(c, text=c)
 
-        self.tv.column("Data/Hora", width=120, anchor="center")
-        self.tv.column("Tipo de Movimentação", width=170, anchor="w")
+        self.tv.column("Data/Hora", width=125, anchor="center")
+        self.tv.column("Tipo de Movimentação", width=175, anchor="w")
         self.tv.column("Referência", width=110, anchor="center")
-        self.tv.column("Valor (R$)", width=100, anchor="e")
-        self.tv.column("Saldo Após (R$)", width=110, anchor="e")
-        self.tv.column("Detalhes", width=170, anchor="w")
+        self.tv.column("Valor (R$)", width=105, anchor="e")
+        self.tv.column("Saldo Restante Após (R$)", width=150, anchor="e")
+        self.tv.column("Detalhes", width=175, anchor="w")
 
         sb = ttk.Scrollbar(t_frame, orient="vertical", command=self.tv.yview)
         self.tv.configure(yscrollcommand=sb.set)
         self.tv.grid(row=0, column=0, sticky="nsew")
         sb.grid(row=0, column=1, sticky="ns")
 
-        # Tags para colorir compras e pagamentos
         self.tv.tag_configure("COMPRA", foreground="#b71c1c")
         self.tv.tag_configure("PAGAMENTO", foreground="#1b5e20")
 
-        for m in self.timeline:
+        # Barra de Paginação
+        pag_bar = ctk.CTkFrame(self, fg_color="transparent")
+        pag_bar.grid(row=4, column=0, sticky="ew", padx=16, pady=(2, 6))
+
+        self.btn_pag_ant = ctk.CTkButton(pag_bar, text="◀ Anterior", width=90, height=28, fg_color="gray30",
+                                         command=self._pag_anterior)
+        self.btn_pag_ant.pack(side="left", padx=4)
+
+        self.lbl_paginacao = ctk.CTkLabel(pag_bar, text="Página 1 de 1 (0 registros)", font=("Segoe UI", 11, "bold"))
+        self.lbl_paginacao.pack(side="left", padx=12)
+
+        self.btn_pag_prox = ctk.CTkButton(pag_bar, text="Próxima ▶", width=90, height=28, fg_color="gray30",
+                                          command=self._pag_proxima)
+        self.btn_pag_prox.pack(side="left", padx=4)
+
+        # Rodapé com botões de fechar e imprimir
+        bot = ctk.CTkFrame(self, fg_color="transparent")
+        bot.grid(row=5, column=0, sticky="ew", padx=16, pady=(0, 12))
+
+        ctk.CTkLabel(bot, text="* Compras a prazo aumentam a dívida (+) | Pagamentos e abatimentos abatem a dívida (-)",
+                     font=("Segoe UI", 9), text_color="gray50").pack(side="left")
+
+        ctk.CTkButton(bot, text="Fechar", width=100, height=34, fg_color="gray40", command=self.destroy).pack(side="right")
+        ctk.CTkButton(bot, text="🖨️ Imprimir na Bobina Térmica", width=200, height=34, font=("Segoe UI", 11, "bold"),
+                      fg_color=COR, command=self._imprimir).pack(side="right", padx=8)
+
+    def _get_dados_ordenados(self):
+        """Retorna a lista completa ordenada conforme a preferência atual"""
+        dados = list(self.timeline)
+        if self.ordem_decrescente:
+            dados.reverse()  # Mais recentes no topo
+        return dados
+
+    def _atualizar_tabela(self):
+        for r in self.tv.get_children():
+            self.tv.delete(r)
+
+        dados = self._get_dados_ordenados()
+        total_itens = len(dados)
+
+        if total_itens == 0:
+            self.lbl_paginacao.configure(text="Nenhum registro encontrado.")
+            self.btn_pag_ant.configure(state="disabled")
+            self.btn_pag_prox.configure(state="disabled")
+            return
+
+        if self.itens_por_pagina is None:
+            # Mostrar todos
+            itens_pagina = dados
+            total_paginas = 1
+            self.pagina_atual = 1
+        else:
+            total_paginas = max(1, (total_itens + self.itens_por_pagina - 1) // self.itens_por_pagina)
+            if self.pagina_atual > total_paginas:
+                self.pagina_atual = total_paginas
+            if self.pagina_atual < 1:
+                self.pagina_atual = 1
+
+            inicio = (self.pagina_atual - 1) * self.itens_por_pagina
+            fim = inicio + self.itens_por_pagina
+            itens_pagina = dados[inicio:fim]
+
+        for m in itens_pagina:
             dt_str = m["data"].strftime("%d/%m/%Y %H:%M") if hasattr(m["data"], "strftime") else str(m["data"])
             tag = "COMPRA" if "+" in m["tipo"] else "PAGAMENTO"
             self.tv.insert("", "end", values=(
@@ -367,16 +453,34 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 m["detalhe"]
             ), tags=(tag,))
 
-        # Rodapé com botões
-        bot = ctk.CTkFrame(self, fg_color="transparent")
-        bot.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 12))
+        # Atualizar status da paginação
+        txt_pag = f"Página {self.pagina_atual} de {total_paginas} ({total_itens} lançamentos)"
+        self.lbl_paginacao.configure(text=txt_pag)
 
-        ctk.CTkLabel(bot, text="* Compras a prazo aumentam a dívida (+) | Pagamentos e abatimentos abatem a dívida (-)",
-                     font=("Segoe UI", 9), text_color="gray50").pack(side="left")
+        self.btn_pag_ant.configure(state="normal" if self.pagina_atual > 1 else "disabled")
+        self.btn_pag_prox.configure(state="normal" if self.pagina_atual < total_paginas else "disabled")
 
-        ctk.CTkButton(bot, text="Fechar", width=100, height=34, fg_color="gray40", command=self.destroy).pack(side="right")
-        ctk.CTkButton(bot, text="🖨️ Imprimir na Bobina Térmica", width=200, height=34, font=("Segoe UI", 11, "bold"),
-                      fg_color=COR, command=self._imprimir).pack(side="right", padx=8)
+    def _on_mudar_ordem(self, valor):
+        self.ordem_decrescente = "Decrescente" in valor
+        self.pagina_atual = 1
+        self._atualizar_tabela()
+
+    def _on_mudar_itens_por_pag(self, valor):
+        if valor == "Todos":
+            self.itens_por_pagina = None
+        else:
+            self.itens_por_pagina = int(valor)
+        self.pagina_atual = 1
+        self._atualizar_tabela()
+
+    def _pag_anterior(self):
+        if self.pagina_atual > 1:
+            self.pagina_atual -= 1
+            self._atualizar_tabela()
+
+    def _pag_proxima(self):
+        self.pagina_atual += 1
+        self._atualizar_tabela()
 
     def _imprimir(self):
         from core.impressao import emitir_extrato_cliente
