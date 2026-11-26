@@ -232,13 +232,13 @@ class ModalBuscarCliente(ctk.CTkToplevel):
         self.on_selecionado = on_selecionado
 
         self.title("Buscar Cliente")
-        self.geometry("650x420")
+        self.geometry("740x440")
         self.resizable(False, False)
         self.grab_set()
 
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.geometry(f"650x420+{(sw-650)//2}+{(sh-420)//2}")
+        self.geometry(f"740x440+{(sw-740)//2}+{(sh-440)//2}")
 
         self._build()
 
@@ -265,12 +265,13 @@ class ModalBuscarCliente(ctk.CTkToplevel):
         f_tv.grid_columnconfigure(0, weight=1)
         f_tv.grid_rowconfigure(0, weight=1)
 
-        cols = ("ID", "Nome do Cliente", "CPF/CNPJ", "Cidade", "Detalhes")
+        cols = ("ID", "Nome do Cliente", "Apelido", "CPF/CNPJ", "Cidade", "Detalhes")
         self.tv = ttk.Treeview(f_tv, columns=cols, show="headings", selectmode="browse", style="SAC.Treeview")
         for c in cols: self.tv.heading(c, text=c)
 
         self.tv.column("ID",              width=50,  anchor="center")
-        self.tv.column("Nome do Cliente", width=240)
+        self.tv.column("Nome do Cliente", width=200)
+        self.tv.column("Apelido",         width=130)
         self.tv.column("CPF/CNPJ",        width=110, anchor="center")
         self.tv.column("Cidade",          width=100)
         self.tv.column("Detalhes",        width=130)
