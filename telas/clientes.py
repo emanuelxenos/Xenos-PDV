@@ -117,6 +117,109 @@ class ModalCliente(ctk.CTkToplevel):
             messagebox.showerror("Erro ao Salvar Cliente", f"Não foi possível salvar o cliente:\n\n{str(ex)}", parent=self)
 
 
+class ModalVisualizarCliente(ctk.CTkToplevel):
+    """
+    Modal de visualização detalhada dos dados do cliente em modo somente-leitura.
+    Permite conferir dados cadastrais, endereço, contatos, apelido e filiação
+    sem risco de alterar nada por acidente.
+    """
+    def __init__(self, master, cliente, on_editar=None):
+        super().__init__(master)
+        self.cliente = cliente
+        self.on_editar = on_editar
+
+        self.title(f"Ficha do Cliente — {self.cliente.nome}")
+        self.geometry("560x620")
+        self.resizable(False, False)
+        self.grab_set()
+
+        self.update_idletasks()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        self.geometry(f"560x620+{(sw-560)//2}+{(sh-620)//2}")
+
+        self._build()
+
+    def _build(self):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+
+        # Header
+        h = ctk.CTkFrame(self, fg_color=COR, corner_radius=0, height=50)
+        h.grid(row=0, column=0, sticky="ew")
+        ctk.CTkLabel(h, text=f"👤 Ficha do Cliente #{self.cliente.id:04d}", font=("Segoe UI", 15, "bold"), text_color="white").pack(side="left", padx=20, pady=12)
+        if self.cliente.ativo:
+            ctk.CTkLabel(h, text="ATIVO", font=("Segoe UI", 10, "bold"), text_color="#c8e6c9").pack(side="right", padx=20)
+        else:
+            ctk.CTkLabel(h, text="INATIVO", font=("Segoe UI", 10, "bold"), text_color="#ffcdd2").pack(side="right", padx=20)
+
+        # Corpo com Scroll
+        form = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        form.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        form.grid_columnconfigure(0, weight=1)
+
+        def _bloco(titulo):
+            sec = ctk.CTkFrame(form, fg_color="#eceff1", corner_radius=6)
+            sec.pack(fill="x", pady=(10, 4))
+            ctk.CTkLabel(sec, text=titulo, font=("Segoe UI", 11, "bold"), text_color="#37474f").pack(anchor="w", padx=10, pady=4)
+
+        def _campo(rotulo, valor, cor_valor=None):
+            f_linha = ctk.CTkFrame(form, fg_color="white", corner_radius=6)
+            f_linha.pack(fill="x", pady=2)
+            f_linha.grid_columnconfigure(1, weight=1)
+            ctk.CTkLabel(f_linha, text=rotulo, font=("Segoe UI", 10, "bold"), text_color="gray40", width=130, anchor="w").grid(row=0, column=0, padx=12, pady=6, sticky="w")
+            txt = str(valor) if valor not in [None, ""] else "—"
+            cor = cor_valor if cor_valor else ("#1b5e20" if rotulo == "Limite de Crédito" else "black")
+            ctk.CTkLabel(f_linha, text=txt, font=("Segoe UI", 11), text_color=cor, anchor="w").grid(row=0, column=1, padx=(0, 12), pady=6, sticky="ew")
+
+        # Dados Principais
+        _bloco("DADOS PRINCIPAIS")
+        _campo("Nome Completo", self.cliente.nome)
+        _campo("Apelido / Vulgo", self.cliente.apelido)
+        _campo("CPF / CNPJ", self.cliente.cpf_cnpj)
+        lim_txt = f"R$ {self.cliente.limite_credito:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if self.cliente.limite_credito else "R$ 0,00"
+        _campo("Limite de Crédito", lim_txt)
+
+        # Contato
+        _bloco("CONTATO")
+        _campo("Celular", self.cliente.celular)
+        _campo("Telefone Fixo", self.cliente.telefone)
+        _campo("E-mail", self.cliente.email)
+
+        # Endereço
+        _bloco("ENDEREÇO")
+        _campo("Logradouro", self.cliente.endereco)
+        _campo("Número", self.cliente.numero)
+        _campo("Bairro", self.cliente.bairro)
+        _campo("Cidade / UF", f"{self.cliente.cidade or 'QUIXABA'} - {self.cliente.estado or 'PE'}")
+        _campo("CEP", self.cliente.cep)
+
+        # Observações e Filiação
+        _bloco("OBSERVAÇÕES / OUTROS DADOS")
+        obs_txt = self.cliente.observacao or "Nenhuma observação registrada."
+        f_obs = ctk.CTkFrame(form, fg_color="white", corner_radius=6)
+        f_obs.pack(fill="x", pady=2)
+        ctk.CTkLabel(f_obs, text=obs_txt, font=("Segoe UI", 11), text_color="#37474f", wraplength=480, justify="left").pack(anchor="w", padx=12, pady=8)
+
+        # Data de Cadastro
+        if self.cliente.criado_em:
+            dt_cad = self.cliente.criado_em.strftime("%d/%m/%Y às %H:%M") if hasattr(self.cliente.criado_em, "strftime") else str(self.cliente.criado_em)
+            _campo("Cadastrado em", dt_cad)
+
+        # Rodapé
+        bot = ctk.CTkFrame(self, fg_color="transparent")
+        bot.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 14))
+
+        ctk.CTkButton(bot, text="Fechar", width=100, height=36, fg_color="gray40", command=self.destroy).pack(side="right")
+        if self.on_editar:
+            ctk.CTkButton(bot, text="✏️ Editar Dados", width=130, height=36, font=("Segoe UI", 11, "bold"),
+                          fg_color=COR, command=self._chamar_editar).pack(side="right", padx=8)
+
+    def _chamar_editar(self):
+        self.destroy()
+        if self.on_editar:
+            self.on_editar(self.cliente)
+
+
 class TelaClientes(ctk.CTkFrame):
     def __init__(self, master, **kw):
         super().__init__(master, fg_color="transparent", **kw)
@@ -143,9 +246,10 @@ class TelaClientes(ctk.CTkFrame):
         self.busca.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.busca.bind("<KeyRelease>", lambda e: self._load(self.busca.get()))
 
-        ctk.CTkButton(bar, text="📜 Extrato Financeiro", width=150, height=32, fg_color="#880e4f", hover_color="#ad1457", command=self._extrato).grid(row=0, column=1, padx=4)
-        ctk.CTkButton(bar, text="✏️ Editar", width=90, height=32, fg_color=COR, command=self._editar).grid(row=0, column=2, padx=4)
-        ctk.CTkButton(bar, text="🗑️ Excluir", width=90, height=32, fg_color=VM, command=self._excluir).grid(row=0, column=3, padx=4)
+        ctk.CTkButton(bar, text="👁️ Visualizar", width=105, height=32, font=("Segoe UI", 11, "bold"), fg_color="#00695c", hover_color="#004d40", command=self._visualizar).grid(row=0, column=1, padx=3)
+        ctk.CTkButton(bar, text="📜 Extrato", width=100, height=32, fg_color="#880e4f", hover_color="#ad1457", command=self._extrato).grid(row=0, column=2, padx=3)
+        ctk.CTkButton(bar, text="✏️ Editar", width=90, height=32, fg_color=COR, command=self._editar).grid(row=0, column=3, padx=3)
+        ctk.CTkButton(bar, text="🗑️ Excluir", width=90, height=32, fg_color=VM, command=self._excluir).grid(row=0, column=4, padx=3)
 
         t_frame = ctk.CTkFrame(self, corner_radius=8)
         t_frame.grid(row=2, column=0, sticky="nsew", padx=16, pady=(4, 16))
@@ -171,7 +275,7 @@ class TelaClientes(ctk.CTkFrame):
         sb.grid(row=0, column=1, sticky="ns", pady=10)
         self.tv.configure(yscrollcommand=sb.set)
 
-        self.tv.bind("<Double-1>", lambda e: self._editar())
+        self.tv.bind("<Double-1>", lambda e: self._visualizar())
 
     def _load(self, f=""):
         for r in self.tv.get_children():
@@ -208,6 +312,11 @@ class TelaClientes(ctk.CTkFrame):
             return
         from telas.contas_receber import ModalExtratoCliente
         ModalExtratoCliente(self, cli)
+
+    def _visualizar(self):
+        c = self._sel()
+        if c:
+            ModalVisualizarCliente(self, cliente=c, on_editar=lambda cli: ModalCliente(self, cliente=cli, on_salvar=self._load))
 
     def _editar(self):
         c = self._sel()
