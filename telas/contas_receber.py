@@ -182,7 +182,8 @@ class ModalExtratoCliente(ctk.CTkToplevel):
         # 1. Obter todas as vendas a prazo do cliente
         vendas_prazo = db_session.query(Venda).filter(
             Venda.cliente_id == self.cliente.id,
-            Venda.forma_pgto.ilike("%A PRAZO%")
+            Venda.forma_pgto.ilike("%A PRAZO%"),
+            Venda.status != "CANCELADA"
         ).order_by(Venda.data.asc()).all()
 
         # 2. Obter todas as contas a receber do cliente (caso haja avulsas/migradas sem venda)
@@ -207,7 +208,9 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 "ref": f"Venda #{v.numero:06d}",
                 "debito": float(v.total or 0.0),
                 "credito": 0.0,
-                "detalhe": f"Forma: {v.forma_pgto}"
+                "detalhe": f"Forma: {v.forma_pgto}",
+                "venda_id": v.id,
+                "numero_venda": v.numero
             })
 
         for c in contas:
@@ -275,7 +278,9 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 "valor": valor_mov,
                 "saldo_apos": saldo,
                 "detalhe": ev["detalhe"],
-                "tipo_raw": ev["tipo_raw"]
+                "tipo_raw": ev["tipo_raw"],
+                "venda_id": ev.get("venda_id"),
+                "numero_venda": ev.get("numero_venda")
             })
 
         saldo_real_contas = sum(c.saldo_devedor for c in contas if c.status != "PAGO")
@@ -402,8 +407,10 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                      font=("Segoe UI", 9), text_color="gray50").pack(side="left")
 
         ctk.CTkButton(bot, text="Fechar", width=100, height=34, fg_color="gray40", command=self.destroy).pack(side="right")
-        ctk.CTkButton(bot, text="🖨️ Imprimir na Bobina Térmica", width=200, height=34, font=("Segoe UI", 11, "bold"),
-                      fg_color=COR, command=self._imprimir).pack(side="right", padx=8)
+        ctk.CTkButton(bot, text="🖨️ Imprimir na Bobina Térmica", width=190, height=34, font=("Segoe UI", 11, "bold"),
+                      fg_color=COR, command=self._imprimir).pack(side="right", padx=6)
+        ctk.CTkButton(bot, text="🗑️ Cancelar Venda Selecionada", width=220, height=34, font=("Segoe UI", 11, "bold"),
+                      fg_color="#c62828", hover_color="#b71c1c", command=self._cancelar_venda_selecionada).pack(side="right", padx=6)
 
     def _get_dados_ordenados(self):
         """Retorna a lista completa ordenada conforme a preferência atual"""
@@ -441,10 +448,13 @@ class ModalExtratoCliente(ctk.CTkToplevel):
             fim = inicio + self.itens_por_pagina
             itens_pagina = dados[inicio:fim]
 
-        for m in itens_pagina:
+        self._mapa_itens_pagina = {}
+        for idx_row, m in enumerate(itens_pagina):
+            row_id = str(idx_row)
+            self._mapa_itens_pagina[row_id] = m
             dt_str = m["data"].strftime("%d/%m/%Y %H:%M") if hasattr(m["data"], "strftime") else str(m["data"])
             tag = "COMPRA" if "+" in m["tipo"] else "PAGAMENTO"
-            self.tv.insert("", "end", values=(
+            self.tv.insert("", "end", iid=row_id, values=(
                 dt_str,
                 m["tipo"],
                 m["ref"],
@@ -481,6 +491,91 @@ class ModalExtratoCliente(ctk.CTkToplevel):
     def _pag_proxima(self):
         self.pagina_atual += 1
         self._atualizar_tabela()
+
+    def _cancelar_venda_selecionada(self):
+        """
+        Permite ao operador cancelar uma venda feita acidentalmente para o cliente,
+        estornando o estoque dos itens, cancelando a venda e deduzindo o valor exato
+        da dívida em aberto sem necessidade de simular pagamento.
+        """
+        sel = self.tv.selection()
+        if not sel:
+            messagebox.showwarning("Aviso", "Selecione uma compra na lista para cancelar/excluir!", parent=self)
+            return
+
+        item = getattr(self, "_mapa_itens_pagina", {}).get(sel[0])
+        if not item:
+            messagebox.showwarning("Aviso", "Não foi possível identificar o lançamento selecionado.", parent=self)
+            return
+
+        if item.get("tipo_raw") != "COMPRA" or not item.get("venda_id"):
+            messagebox.showinfo("Informação", "Apenas lançamentos de VENDA/COMPRA podem ser cancelados aqui.\nPara pagamentos ou abatimentos, consulte o caixa.", parent=self)
+            return
+
+        venda_id = item["venda_id"]
+        venda = db_session.query(Venda).get(venda_id)
+        if not venda:
+            messagebox.showerror("Erro", "Venda não encontrada no banco de dados!", parent=self)
+            return
+
+        valor_venda = float(venda.total or 0.0)
+        num_venda = venda.numero
+
+        msg_conf = (
+            f"Deseja realmente CANCELAR e EXCLUIR a Venda #{num_venda:06d}?\n\n"
+            f"• Cliente: {self.cliente.nome}\n"
+            f"• Valor Total: R$ {valor_venda:.2f}\n"
+            f"• Os itens da venda serão estornados de volta ao Estoque.\n"
+            f"• O saldo devedor do cliente será reduzido em R$ {valor_venda:.2f}."
+        )
+
+        if not messagebox.askyesno("Confirmar Cancelamento de Venda", msg_conf, parent=self):
+            return
+
+        try:
+            # 1. Devolver itens ao estoque
+            for it in (venda.itens or []):
+                if it.produto:
+                    it.produto.estoque = (it.produto.estoque or 0.0) + (it.quantidade or 0.0)
+
+            # 2. Deduzir o valor da venda da conta a receber do cliente
+            # Procura conta associada à venda ou a conta em aberto do cliente
+            contas_cliente = db_session.query(ContaReceber).filter(
+                ContaReceber.cliente_id == self.cliente.id,
+                ContaReceber.status.in_(["PENDENTE", "PARCIAL"])
+            ).order_by(ContaReceber.id.desc()).all()
+
+            # Desconta o valor da dívida
+            valor_restante_abater = valor_venda
+            for c in contas_cliente:
+                if valor_restante_abater <= 0:
+                    break
+                abatimento = min(c.saldo_devedor, valor_restante_abater)
+                c.saldo_devedor = max(0.0, c.saldo_devedor - abatimento)
+                c.valor_total = max(0.0, (c.valor_total or 0.0) - abatimento)
+                if c.saldo_devedor <= 0.001:
+                    c.saldo_devedor = 0.0
+                    c.status = "PAGO" if (c.valor_pago or 0.0) > 0 else "CANCELADO"
+                valor_restante_abater -= abatimento
+
+            # 3. Marcar a venda como CANCELADA
+            venda.status = "CANCELADA"
+            venda.observacao = f"{(venda.observacao or '')} [CANCELADA NO EXTRATO EM {datetime.now().strftime('%d/%m/%Y %H:%M')}]".strip()
+
+            db_session.commit()
+            messagebox.showinfo("Sucesso", f"Venda #{num_venda:06d} cancelada com sucesso!\nEstoque devolvido e dívida abatida.", parent=self)
+
+            # Recarrega os dados do extrato
+            self._carregar_dados()
+            self._atualizar_tabela()
+
+            # Se o master for TelaContasReceber, atualizar a lista de trás
+            if hasattr(self.master, "_load"):
+                self.master._load()
+
+        except Exception as ex:
+            db_session.rollback()
+            messagebox.showerror("Erro ao Cancelar Venda", f"Falha ao cancelar a venda:\n{str(ex)}", parent=self)
 
     def _imprimir(self):
         from core.impressao import emitir_extrato_cliente

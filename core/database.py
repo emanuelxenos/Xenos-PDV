@@ -54,6 +54,7 @@ class Cliente(Base):
     __tablename__ = "clientes"
     id             = Column(Integer, primary_key=True, autoincrement=True)
     nome           = Column(String(100), nullable=False)
+    apelido        = Column(String(100), nullable=True)
     cpf_cnpj       = Column(String(20))
     telefone       = Column(String(20))
     celular        = Column(String(20))

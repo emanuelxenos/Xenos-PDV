@@ -305,6 +305,7 @@ class ModalBuscarCliente(ctk.CTkToplevel):
         if termo:
             q = q.filter(
                 (Cliente.nome.ilike(f"%{termo}%")) |
+                (Cliente.apelido.ilike(f"%{termo}%")) |
                 (Cliente.cpf_cnpj.ilike(f"%{termo}%")) |
                 (Cliente.observacao.ilike(f"%{termo}%"))
             )
@@ -314,7 +315,7 @@ class ModalBuscarCliente(ctk.CTkToplevel):
         for c in clis:
             self._mapa[str(c.id)] = c
             self.tv.insert("", "end", iid=str(c.id), values=(
-                c.id, c.nome, c.cpf_cnpj or "-", c.cidade or "QUIXABA", c.observacao or ""
+                c.id, c.nome, c.apelido or "-", c.cpf_cnpj or "-", c.cidade or "QUIXABA", c.observacao or ""
             ))
 
         if clis:
@@ -539,7 +540,8 @@ class TelaPDV(ctk.CTkFrame):
 
     def _definir_cliente(self, cliente):
         self.cliente_selecionado = cliente
-        self.lbl_cliente_nome.configure(text=f"{cliente.id} - {cliente.nome}")
+        txt_cli = f"{cliente.id} - {cliente.nome}" + (f" ({cliente.apelido})" if cliente.apelido else "")
+        self.lbl_cliente_nome.configure(text=txt_cli)
         self._focar_codigo()
 
     def _limpar_cliente(self):

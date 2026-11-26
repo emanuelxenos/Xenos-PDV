@@ -45,6 +45,7 @@ class ModalCliente(ctk.CTkToplevel):
         # Sem campo de código manual: o ID é automático
         campos = [
             ("Nome do Cliente *", "nome"),
+            ("Apelido / Vulgo",   "apelido"),
             ("CPF / CNPJ",        "cpf_cnpj"),
             ("Telefone",          "telefone"),
             ("Celular",           "celular"),
@@ -151,7 +152,7 @@ class TelaClientes(ctk.CTkFrame):
         t_frame.grid_columnconfigure(0, weight=1)
         t_frame.grid_rowconfigure(0, weight=1)
 
-        cols = ("#", "Nome", "CPF / CNPJ", "Telefone", "Celular", "Cidade", "UF", "Limite Crédito")
+        cols = ("#", "Nome", "Apelido", "CPF / CNPJ", "Telefone", "Celular", "Cidade", "UF", "Limite Crédito")
         self.tv = ttk.Treeview(t_frame, columns=cols, show="headings", selectmode="browse", style="SAC.Treeview")
         for c in cols:
             self.tv.heading(c, text=c)
@@ -179,6 +180,7 @@ class TelaClientes(ctk.CTkFrame):
         if f:
             q = q.filter(
                 Cliente.nome.ilike(f"%{f}%") |
+                Cliente.apelido.ilike(f"%{f}%") |
                 Cliente.cpf_cnpj.ilike(f"%{f}%") |
                 Cliente.telefone.ilike(f"%{f}%") |
                 Cliente.cidade.ilike(f"%{f}%")
@@ -186,7 +188,7 @@ class TelaClientes(ctk.CTkFrame):
         for c in q.order_by(Cliente.nome):
             lim = f"R$ {c.limite_credito:.2f}" if c.limite_credito else "R$ 0,00"
             self.tv.insert("", "end", iid=str(c.id),
-                           values=(c.id, c.nome, c.cpf_cnpj or "",
+                           values=(c.id, c.nome, c.apelido or "", c.cpf_cnpj or "",
                                    c.telefone or "", c.celular or "",
                                    c.cidade or "", c.estado or "", lim))
 
