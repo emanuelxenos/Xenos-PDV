@@ -193,5 +193,38 @@ class HistoricoPagamentoConta(Base):
 def criar_tabelas():
     Base.metadata.create_all(engine)
 
+    # Migração automática e transparente para bancos já existentes nos computadores dos clientes:
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            # 1. Garantir que a coluna 'apelido' exista na tabela clientes
+            cols = [r[1] for r in conn.execute(text("PRAGMA table_info(clientes)")).fetchall()]
+            if "apelido" not in cols:
+                conn.execute(text("ALTER TABLE clientes ADD COLUMN apelido VARCHAR(100)"))
+                conn.commit()
+
+        # 2. Se houver clientes com 'Apelido:' nas observações e campo apelido vazio, extrai automaticamente
+        clis_pendentes = db_session.query(Cliente).filter(
+            Cliente.observacao.ilike("%Apelido:%"),
+            (Cliente.apelido == None) | (Cliente.apelido == "")
+        ).all()
+
+        if clis_pendentes:
+            for c in clis_pendentes:
+                partes = [p.strip() for p in (c.observacao or "").split("|")]
+                apelido_val = None
+                novas_partes = []
+                for p in partes:
+                    if p.startswith("Apelido:"):
+                        apelido_val = p.replace("Apelido:", "").strip()
+                    else:
+                        novas_partes.append(p)
+                if apelido_val:
+                    c.apelido = apelido_val
+                    c.observacao = " | ".join(novas_partes) if novas_partes else None
+            db_session.commit()
+    except Exception as ex:
+        print("[AVISO] Falha na auto-migração de apelidos:", ex)
+
 def get_session():
     return db_session
