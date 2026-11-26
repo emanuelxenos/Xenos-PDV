@@ -183,6 +183,7 @@ class HistoricoPagamentoConta(Base):
     saldo_anterior = Column(Float, default=0.0)
     saldo_restante = Column(Float, default=0.0)
     usuario_id     = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    pago_por       = Column(String(100), nullable=True)
     observacao     = Column(String(150), nullable=True)
 
     conta          = relationship("ContaReceber", back_populates="historico_pagamentos")

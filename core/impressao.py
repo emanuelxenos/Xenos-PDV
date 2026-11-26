@@ -127,7 +127,7 @@ def emitir_comprovante(venda, itens, operador="Operador", abrir_visualizacao=Fal
     return sucesso_direto
 
 
-def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", nome_empresa=None):
+def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", nome_empresa=None, pago_por=None):
     """
     Formata recibo não fiscal compacto para bobina térmica.
     """
@@ -145,6 +145,8 @@ def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador
     linhas.append(f"Operador: {operador}")
     cli_nome = conta.cliente.nome if conta.cliente else "Consumidor"
     linhas.append(f"Cliente : {cli_nome[:30]}")
+    if pago_por and pago_por.strip():
+        linhas.append(f"Pago por: {pago_por.strip()[:30]}")
     if conta.cliente and conta.cliente.cpf_cnpj:
         linhas.append(f"CPF/CNPJ: {conta.cliente.cpf_cnpj}")
     linhas.append(sep_fina)
@@ -169,11 +171,11 @@ def formatar_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador
     return "\n".join(linhas)
 
 
-def emitir_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", abrir_visualizacao=False):
+def emitir_recibo_pagamento(conta, valor_pago, forma_pgto="DINHEIRO", operador="Operador", abrir_visualizacao=False, pago_por=None):
     """
     Salva o recibo e imprime direto no spooler da impressora térmica sem abrir Notepad.
     """
-    recibo_txt = formatar_recibo_pagamento(conta, valor_pago, forma_pgto=forma_pgto, operador=operador)
+    recibo_txt = formatar_recibo_pagamento(conta, valor_pago, forma_pgto=forma_pgto, operador=operador, pago_por=pago_por)
     from core.caminhos import obter_caminho_dados
     pasta_cupons = obter_caminho_dados("cupons")
     os.makedirs(pasta_cupons, exist_ok=True)

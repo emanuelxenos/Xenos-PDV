@@ -19,13 +19,13 @@ class ModalBaixaConta(ctk.CTkToplevel):
         self.on_sucesso = on_sucesso
 
         self.title("Receber Pagamento de Conta")
-        self.geometry("450x460")
+        self.geometry("460x520")
         self.resizable(False, False)
         self.grab_set()
 
         self.update_idletasks()
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self.geometry(f"450x460+{(sw-450)//2}+{(sh-460)//2}")
+        self.geometry(f"460x520+{(sw-460)//2}+{(sh-520)//2}")
 
         self._build()
 
@@ -61,7 +61,11 @@ class ModalBaixaConta(ctk.CTkToplevel):
         ctk.CTkLabel(f, text="Forma de Entrada no Caixa:", font=("Segoe UI", 11)).pack(anchor="w", pady=(0, 2))
         self.combo_forma = ctk.CTkComboBox(f, values=["DINHEIRO", "PIX", "CARTAO DEBITO", "CARTAO CREDITO"], height=34)
         self.combo_forma.set("DINHEIRO")
-        self.combo_forma.pack(fill="x", pady=(0, 14))
+        self.combo_forma.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(f, text="Quem está pagando? (Deixar vazio se for o próprio cliente):", font=("Segoe UI", 10, "bold"), text_color="#37474f").pack(anchor="w", pady=(0, 2))
+        self.ent_pago_por = ctk.CTkEntry(f, height=34, placeholder_text="Ex: Filho(a), Esposa, Vizinho, Próprio...")
+        self.ent_pago_por.pack(fill="x", pady=(0, 12))
 
         self.check_comprovante = ctk.CTkCheckBox(f, text="Imprimir Comprovante de Pagamento / Abate",
                                                  font=("Segoe UI", 11, "bold"), text_color="#ad1457")
@@ -103,8 +107,13 @@ class ModalBaixaConta(ctk.CTkToplevel):
             self.conta.status = "PARCIAL"
 
         forma = self.combo_forma.get()
+        quem_pagou = self.ent_pago_por.get().strip() or None
 
         # Registrar no histórico de pagamentos/abatimentos
+        obs_hist = f"Abate/Pgto Conta #{self.conta.id}"
+        if quem_pagou:
+            obs_hist += f" (Pago por: {quem_pagou})"
+
         hist = HistoricoPagamentoConta(
             conta_id=self.conta.id,
             cliente_id=self.conta.cliente_id,
@@ -114,7 +123,8 @@ class ModalBaixaConta(ctk.CTkToplevel):
             saldo_anterior=saldo_anterior,
             saldo_restante=self.conta.saldo_devedor,
             usuario_id=self.usuario.id if self.usuario else None,
-            observacao=f"Abate/Pgto Conta #{self.conta.id}"
+            pago_por=quem_pagou,
+            observacao=obs_hist
         )
         db_session.add(hist)
 
@@ -136,7 +146,7 @@ class ModalBaixaConta(ctk.CTkToplevel):
             if self.check_comprovante.get():
                 from core.impressao import emitir_recibo_pagamento
                 op_nome = self.usuario.nome if self.usuario else "Operador"
-                emitir_recibo_pagamento(self.conta, valor_pago=val, forma_pgto=forma, operador=op_nome, abrir_visualizacao=True)
+                emitir_recibo_pagamento(self.conta, valor_pago=val, forma_pgto=forma, operador=op_nome, abrir_visualizacao=True, pago_por=quem_pagou)
 
             messagebox.showinfo("Sucesso", f"Recebimento de R$ {val:.2f} registrado com sucesso!\nSaldo devedor restante: R$ {self.conta.saldo_devedor:.2f}", parent=self)
             if self.on_sucesso:
@@ -230,6 +240,12 @@ class ModalExtratoCliente(ctk.CTkToplevel):
         total_pago_historico = 0.0
         for p in pagamentos:
             total_pago_historico += p.valor_pago
+            detalhe_pgto = p.forma_pgto
+            if getattr(p, "pago_por", None):
+                detalhe_pgto += f" • Pago por: {p.pago_por}"
+            elif p.observacao:
+                detalhe_pgto += f" ({p.observacao})"
+
             eventos.append({
                 "data": p.data_hora,
                 "tipo_raw": "PAGAMENTO",
@@ -237,7 +253,7 @@ class ModalExtratoCliente(ctk.CTkToplevel):
                 "ref": f"Recibo #{p.id:06d}",
                 "debito": 0.0,
                 "credito": float(p.valor_pago),
-                "detalhe": f"{p.forma_pgto} ({p.observacao or ''})"
+                "detalhe": detalhe_pgto
             })
 
         total_pago_contas = sum(c.valor_pago or 0.0 for c in contas)
