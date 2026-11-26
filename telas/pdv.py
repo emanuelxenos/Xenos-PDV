@@ -100,6 +100,8 @@ class ModalSelecionarProduto(ctk.CTkToplevel):
         if p and self.on_selecionado:
             self.on_selecionado(p)
         self.destroy()
+        if hasattr(self.master, "_focar_codigo"):
+            self.master._focar_codigo()
 
 
 class ModalPesagemProduto(ctk.CTkToplevel):
@@ -216,6 +218,8 @@ class ModalPesagemProduto(ctk.CTkToplevel):
         if self.on_confirmar:
             self.on_confirmar(peso, total)
         self.destroy()
+        if hasattr(self.master, "_focar_codigo"):
+            self.master._focar_codigo()
 
 
 class ModalBuscarCliente(ctk.CTkToplevel):
@@ -325,6 +329,8 @@ class ModalBuscarCliente(ctk.CTkToplevel):
         if c and self.on_selecionado:
             self.on_selecionado(c)
         self.destroy()
+        if hasattr(self.master, "_focar_codigo"):
+            self.master._focar_codigo()
 
 
 class ModalComprovante(ctk.CTkToplevel):
@@ -386,7 +392,14 @@ class TelaPDV(ctk.CTkFrame):
 
     def focar_pesquisa(self):
         """Coloca o foco imediatamente no campo de código de barras/pesquisa."""
-        self.after(100, lambda: self.ent_codigo.focus_set())
+        self._focar_codigo()
+
+    def _focar_codigo(self):
+        """Garante que o campo de busca de produto receba o foco e o cursor."""
+        try:
+            self.after(50, lambda: self.ent_codigo.focus_set())
+        except Exception:
+            pass
 
     def _ui(self):
         self.grid_columnconfigure(0, weight=3)
@@ -527,10 +540,12 @@ class TelaPDV(ctk.CTkFrame):
     def _definir_cliente(self, cliente):
         self.cliente_selecionado = cliente
         self.lbl_cliente_nome.configure(text=f"{cliente.id} - {cliente.nome}")
+        self._focar_codigo()
 
     def _limpar_cliente(self):
         self.cliente_selecionado = None
         self.lbl_cliente_nome.configure(text="Consumidor Final")
+        self._focar_codigo()
 
     def _adicionar_item(self):
         termo = self.ent_codigo.get().strip()
@@ -648,6 +663,13 @@ class TelaPDV(ctk.CTkFrame):
                                values=(i, it["produto_id"], it["descricao"], f"{it['qtd']:.2f}",
                                        f"{it['preco']:.2f}", f"{it['total']:.2f}"))
             self._atualizar_totais()
+        self._focar_codigo()
+
+        # Atalhos de conveniência do operador:
+        # F2 ou Escape: foca imediatamente no campo de busca/código
+        self.bind("<F2>", lambda e: self._focar_codigo())
+        self.bind("<Escape>", lambda e: self._focar_codigo())
+        self.tv.bind("<Delete>", lambda e: self._remover_item())
 
     def _calcular_desconto_valor(self, subtotal):
         try:
@@ -810,4 +832,4 @@ class TelaPDV(ctk.CTkFrame):
         self.lbl_troco.configure(text="Troco: R$ 0,00")
         self._limpar_cliente()
         self.combo_pgto.set("DINHEIRO")
-        self.ent_codigo.focus()
+        self._focar_codigo()
