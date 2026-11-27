@@ -7,6 +7,7 @@ import webbrowser
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import customtkinter as ctk
+from core.caminhos import obter_caminho_asset
 from core.database import criar_tabelas, db_session, Cliente, Fornecedor, Produto, Venda, ContaReceber
 from core.auth import criar_admin_padrao
 from core.licenca import verificar_licenca
@@ -55,8 +56,8 @@ class App(ctk.CTk):
         self._checar_licenca_inicial()
 
     def _configurar_icone(self):
-        caminho_ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icone.ico")
-        if os.path.exists(caminho_ico):
+        caminho_ico = obter_caminho_asset("icone.ico")
+        if caminho_ico and os.path.exists(caminho_ico):
             try:
                 self.iconbitmap(caminho_ico)
             except Exception:
@@ -95,8 +96,8 @@ class App(ctk.CTk):
         top_brand = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         top_brand.grid(row=0, column=0, padx=14, pady=(14, 2), sticky="w")
 
-        caminho_logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icone.png")
-        if os.path.exists(caminho_logo):
+        caminho_logo = obter_caminho_asset("icone.png")
+        if caminho_logo and os.path.exists(caminho_logo):
             try:
                 from PIL import Image
                 img_pil = Image.open(caminho_logo)
@@ -255,8 +256,24 @@ class App(ctk.CTk):
         frame = ctk.CTkFrame(self.frame_conteudo, fg_color="transparent")
         frame.grid_columnconfigure((0, 1, 2, 3), weight=1)
 
-        ctk.CTkLabel(frame, text="📊  Painel Geral / Dashboard", font=("Segoe UI", 22, "bold")).grid(
-            row=0, column=0, columnspan=4, sticky="w", pady=(20, 16), padx=24)
+        header_box = ctk.CTkFrame(frame, fg_color="transparent")
+        header_box.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(18, 12), padx=24)
+        header_box.grid_columnconfigure(0, weight=1)
+
+        tit_box = ctk.CTkFrame(header_box, fg_color="transparent")
+        tit_box.pack(side="left")
+
+        logo_dash_path = obter_caminho_asset("icone.png")
+        if logo_dash_path and os.path.exists(logo_dash_path):
+            try:
+                from PIL import Image
+                img_pil = Image.open(logo_dash_path)
+                self._img_logo_dash = ctk.CTkImage(light_image=img_pil, dark_image=img_pil, size=(42, 42))
+                ctk.CTkLabel(tit_box, image=self._img_logo_dash, text="").pack(side="left", padx=(0, 10))
+            except Exception:
+                pass
+
+        ctk.CTkLabel(tit_box, text="⚡ Xenos PDV — Painel Geral", font=("Segoe UI", 22, "bold"), text_color="#1a237e").pack(side="left")
 
         self._dash_cards_lbls = {}
         cards = [

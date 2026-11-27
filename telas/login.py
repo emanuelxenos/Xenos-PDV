@@ -28,8 +28,9 @@ class TelaLogin(ctk.CTkFrame):
         container.grid(row=0, column=0)
 
         # Logo em Imagem
-        caminho_logo = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "icone.png")
-        if os.path.exists(caminho_logo):
+        from core.caminhos import obter_caminho_asset
+        caminho_logo = obter_caminho_asset("icone.png")
+        if caminho_logo and os.path.exists(caminho_logo):
             try:
                 img_pil = Image.open(caminho_logo)
                 img_ctk = ctk.CTkImage(light_image=img_pil, dark_image=img_pil, size=(90, 90))
